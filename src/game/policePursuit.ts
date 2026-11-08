@@ -25,12 +25,14 @@ export class PolicePursuit {
   private readonly scene: THREE.Scene;
   private readonly redLight: THREE.Mesh;
   private readonly blueLight: THREE.Mesh;
+  private readonly redGlow: THREE.PointLight;
+  private readonly blueGlow: THREE.PointLight;
   private readonly extraMaterials: THREE.Material[] = [];
   private readonly extraGeometries: THREE.BufferGeometry[] = [];
   private elapsed = 0;
   private active = false;
 
-  private static readonly SAFE_DISTANCE = 24;
+  private static readonly SAFE_DISTANCE = 16;
 
   constructor(config: CarConfig, scene: THREE.Scene) {
     this.scene = scene;
@@ -74,6 +76,11 @@ export class PolicePursuit {
     this.redLight.position.set(-width * 0.13, height * 1.07, 0);
     this.blueLight.position.set(width * 0.13, height * 1.07, 0);
     this.rig.chassisMesh.add(this.redLight, this.blueLight);
+    this.redGlow = new THREE.PointLight(0xff173d, 0, 9, 2);
+    this.blueGlow = new THREE.PointLight(0x176bff, 0, 9, 2);
+    this.redGlow.position.copy(this.redLight.position);
+    this.blueGlow.position.copy(this.blueLight.position);
+    this.rig.chassisMesh.add(this.redGlow, this.blueGlow);
     this.extraMaterials.push(redMaterial, blueMaterial);
     this.extraGeometries.push(lightGeometry);
 
@@ -136,6 +143,8 @@ export class PolicePursuit {
     const redActive = Math.floor(this.elapsed * 6) % 2 === 0;
     (this.redLight.material as THREE.MeshStandardMaterial).emissiveIntensity = redActive ? 4.5 : 0.15;
     (this.blueLight.material as THREE.MeshStandardMaterial).emissiveIntensity = redActive ? 0.15 : 4.5;
+    this.redGlow.intensity = redActive ? 5 : 0;
+    this.blueGlow.intensity = redActive ? 0 : 5;
   }
 
   private placeBehindPlayer(
