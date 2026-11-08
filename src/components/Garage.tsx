@@ -159,6 +159,15 @@ export const Garage: React.FC<GarageProps> = ({
           <span>BACK TO MENU</span>
         </button>
 
+        <a
+          href="models/cars/ATTRIBUTION.md"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden sm:inline-flex px-3 py-2 rounded-xl glass-panel border border-slate-700 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50 font-race text-[10px] tracking-wider transition-colors"
+        >
+          3D MODEL CREDITS
+        </a>
+
         {/* Currency & Bonus Ad */}
         <div className="flex items-center gap-3">
           <button
