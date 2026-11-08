@@ -88,7 +88,7 @@ export class VehiclePhysics {
     // 1. Steering Dynamics (tapered at high speed for stability)
     const speedRatio = Math.abs(this.forwardSpeed) / this.maxSpeedMs;
     const maxSteer = 0.55 - speedRatio * 0.28; // 31 deg at low speed, 15 deg at top speed
-    const steerTarget = -input.steer * maxSteer;
+    const steerTarget = input.steer * maxSteer;
     this.steerAngle = THREE.MathUtils.damp(this.steerAngle, steerTarget, 12, dt);
 
     // 2. Nitro Handling
