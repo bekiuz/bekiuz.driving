@@ -1,0 +1,6 @@
+{
+  "name": "BEKIUZ DRIVE: CITY RUSH",
+  "description": "Commercial-quality 3D arcade racing and open-world city driving game featuring high-speed street races, free drive, drift mechanics, car tuning garage, and Yandex Games SDK integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
