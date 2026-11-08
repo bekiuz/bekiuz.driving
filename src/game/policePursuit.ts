@@ -126,12 +126,11 @@ export class PolicePursuit {
 
     const toPlayer = playerPosition.clone().sub(this.group.position);
     const targetRotation = Math.atan2(toPlayer.x, toPlayer.z);
-    this.group.rotation.y = THREE.MathUtils.dampAngle(
-      this.group.rotation.y,
-      targetRotation,
-      5,
-      delta
+    const angleDifference = Math.atan2(
+      Math.sin(targetRotation - this.group.rotation.y),
+      Math.cos(targetRotation - this.group.rotation.y)
     );
+    this.group.rotation.y += angleDifference * (1 - Math.exp(-5 * delta));
 
     // Alternating red/blue roof lights.
     const redActive = Math.floor(this.elapsed * 6) % 2 === 0;
