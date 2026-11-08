@@ -98,14 +98,27 @@ export const Minimap: React.FC<MinimapProps> = ({
     ctx.lineTo(x2, y2);
     ctx.stroke();
 
-    // Bridge road (East side)
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+    // Bridge deck and its two short approach connectors.
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.65)';
     [x1, y1] = worldToMap(195, -155);
     [x2, y2] = worldToMap(195, 160);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+    ctx.lineWidth = 4;
+    [[180, 160, 195, 160], [180, -155, 195, -155]].forEach(
+      ([sx, sz, ex, ez]) => {
+        const [startX, startY] = worldToMap(sx, sz);
+        const [endX, endY] = worldToMap(ex, ez);
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      }
+    );
 
     // Draw Race Checkpoints
     if (checkpoints && checkpoints.length > 0) {
