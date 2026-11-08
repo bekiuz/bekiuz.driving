@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft, ArrowRight, Flame, RotateCcw, Camera } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Flame, RotateCcw, Camera, Eye } from 'lucide-react';
 import { InputControls } from '../types/game';
 
 interface TouchControlsProps {
@@ -54,11 +54,16 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
     onInputChange((prev) => ({ ...prev, nitro: active }));
   };
 
+  // Hold to look behind and see the police car.
+  const setLookBack = (active: boolean) => {
+    onInputChange((prev) => ({ ...prev, lookBack: active }));
+  };
+
   return (
     <div className="absolute inset-0 pointer-events-none select-none z-30 flex justify-between items-end p-4 sm:p-6 pb-6">
       {/* Left Pod: Steering + Camera & Reset */}
       <div className="flex flex-col gap-3 pointer-events-auto">
-        {/* Quick Utilities: Camera toggle + Reset */}
+        {/* Quick Utilities: Camera, rear view and reset */}
         <div className="flex gap-2 mb-1">
           <button
             onClick={onToggleCamera}
@@ -66,6 +71,18 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             title="Change Camera View"
           >
             <Camera className="w-5 h-5" />
+          </button>
+          <button
+            onTouchStart={() => setLookBack(true)}
+            onTouchEnd={() => setLookBack(false)}
+            onMouseDown={() => setLookBack(true)}
+            onMouseUp={() => setLookBack(false)}
+            onMouseLeave={() => setLookBack(false)}
+            className="w-12 h-12 rounded-xl bg-slate-900/80 active:bg-red-600 border border-slate-700 active:border-red-400 flex items-center justify-center text-slate-300 active:text-white shadow-lg transition-transform active:scale-95"
+            title="Hold to look behind"
+            aria-label="Look behind"
+          >
+            <Eye className="w-5 h-5" />
           </button>
           <button
             onClick={onReset}
