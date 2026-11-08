@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CarConfig, CarCustomization, CarUpgrades, InputControls, RaceTrack, VehicleTelemetry, GameScreen } from '../types/game';
 import { createProceduralCar, CarVisualRig } from './proceduralCar';
 import { createProceduralCity, CityEnvironment } from './proceduralCity';
@@ -51,6 +52,13 @@ export class GameEngine {
 
   // Wheel spin accumulator
   private wheelSpin = 0;
+
+  // Optional CC0 GLB visual for the four premium garage cars.
+  private externalVehicleLoadId = 0;
+  private externalVehicleModel: THREE.Group | null = null;
+  private externalWheelMeshes: THREE.Object3D[] = [];
+  private externalPrimaryPaint: THREE.MeshStandardMaterial[] = [];
+  private externalSecondaryPaint: THREE.MeshStandardMaterial[] = [];
 
   // Callbacks
   private onTelemetryUpdate: (telemetry: VehicleTelemetry) => void;
@@ -149,6 +157,7 @@ export class GameEngine {
     this.scene.add(this.carRig.carGroup);
     this.carRig.carGroup.position.set(0, 0.38, 0);
     this.updateShowroomFraming();
+    void this.loadExternalVehicle(carConfig, customization);
 
     this.physics = new VehiclePhysics(carConfig, carUpgrades, this.city, [0, 0.4, 0], 0);
     this.police = new PolicePursuit(carConfig, this.scene);
@@ -209,6 +218,13 @@ export class GameEngine {
   }
 
   public switchCar(config: CarConfig, upgrades: CarUpgrades, customization: CarCustomization) {
+    // Invalidate any model request still loading for the previous car.
+    this.externalVehicleLoadId++;
+    this.externalVehicleModel = null;
+    this.externalWheelMeshes = [];
+    this.externalPrimaryPaint = [];
+    this.externalSecondaryPaint = [];
+
     // Remove old car visual rig
     this.scene.remove(this.carRig.carGroup);
     this.carRig.dispose();
@@ -219,6 +235,7 @@ export class GameEngine {
     this.carRig.carGroup.position.set(0, 0.38, 0);
     this.carRig.carGroup.rotation.set(0, 0, 0);
     this.updateShowroomFraming();
+    void this.loadExternalVehicle(config, customization);
 
     // Re-initialize physics with new car parameters
     const currentPos = this.physics.position.toArray() as [number, number, number];
@@ -226,8 +243,150 @@ export class GameEngine {
     this.physics = new VehiclePhysics(config, upgrades, this.city, currentPos, currentRot);
   }
 
+
+  /**
+   * Loads a detailed, unbranded CC0 sports-car asset for the premium garage slots.
+   * The procedural rig stays visible until the GLB is fully loaded, so a network
+   * failure never leaves the player with an invisible vehicle.
+   */
+  private async loadExternalVehicle(config: CarConfig, customization: CarCustomization) {
+    const requestId = ++this.externalVehicleLoadId;
+    this.externalVehicleModel = null;
+    this.externalWheelMeshes = [];
+    this.externalPrimaryPaint = [];
+    this.externalSecondaryPaint = [];
+
+    const premiumStyles = ['bmw_m4', 'mercedes_amg', 'bugatti_chiron', 'ferrari_488'];
+    if (!premiumStyles.includes(config.style)) return;
+
+    const urls = [
+      'https://cdn.jsdelivr.net/gh/JaronKBragg7337/spectral-gt-rs@main/spectral_gt_rs_game_ready.glb',
+      'https://jaronkbragg7337.github.io/spectral-gt-rs/spectral_gt_rs_game_ready.glb',
+    ];
+
+    try {
+      const loader = new GLTFLoader();
+      let gltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
+      let lastError: unknown = null;
+
+      for (const url of urls) {
+        try {
+          gltf = await loader.loadAsync(url);
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (!gltf) throw lastError ?? new Error('Vehicle model could not be loaded.');
+
+      const model = gltf.scene;
+      model.name = 'CC0_Detailed_Sports_Car';
+      // The asset's documented front axis is +X; the game uses +Z.
+      model.rotation.y = -Math.PI / 2;
+      model.updateMatrixWorld(true);
+
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      if (!Number.isFinite(size.z) || size.z < 0.1) {
+        throw new Error('Loaded vehicle has invalid dimensions.');
+      }
+
+      // Keep the model close to the configured vehicle length and center it on
+      // the physics origin while preserving the asset's original proportions.
+      const scale = config.dimensions.length / size.z;
+      const center = bounds.getCenter(new THREE.Vector3());
+      model.scale.setScalar(scale);
+      model.position.set(
+        -center.x * scale,
+        -bounds.min.y * scale,
+        -center.z * scale
+      );
+      model.updateMatrixWorld(true);
+
+      const primaryPaint: THREE.MeshStandardMaterial[] = [];
+      const secondaryPaint: THREE.MeshStandardMaterial[] = [];
+      const wheels: THREE.Object3D[] = [];
+
+      model.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+
+        object.castShadow = true;
+        object.receiveShadow = true;
+
+        const sourceMaterials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        const clonedMaterials = sourceMaterials.map((source) => {
+          const material = source.clone();
+          const materialName = material.name.toLowerCase();
+
+          if (material instanceof THREE.MeshStandardMaterial) {
+            if (materialName.includes('spectral blue')) {
+              material.color.set(customization.bodyColor);
+              primaryPaint.push(material);
+            } else if (materialName.includes('midnight blue')) {
+              material.color.set(customization.bodyColor).multiplyScalar(0.22);
+              secondaryPaint.push(material);
+            }
+          }
+
+          return material;
+        });
+
+        object.material = Array.isArray(object.material)
+          ? clonedMaterials
+          : clonedMaterials[0];
+
+        if (object.name.toLowerCase().endsWith('_tire')) {
+          wheels.push(object);
+        }
+      });
+
+      // A late response must never replace a newer car or touch a disposed scene.
+      if (this.isDestroyed || requestId !== this.externalVehicleLoadId) {
+        const geometries = new Set<THREE.BufferGeometry>();
+        const materials = new Set<THREE.Material>();
+        model.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          geometries.add(object.geometry);
+          const list = Array.isArray(object.material) ? object.material : [object.material];
+          list.forEach((material) => materials.add(material));
+        });
+        geometries.forEach((geometry) => geometry.dispose());
+        materials.forEach((material) => material.dispose());
+        return;
+      }
+
+      this.carRig.chassisMesh.visible = false;
+      this.carRig.frontWheelPivots.forEach((pivot) => {
+        pivot.visible = false;
+      });
+      this.carRig.carGroup.add(model);
+
+      this.externalVehicleModel = model;
+      this.externalWheelMeshes = wheels;
+      this.externalPrimaryPaint = primaryPaint;
+      this.externalSecondaryPaint = secondaryPaint;
+      this.updateShowroomFraming();
+    } catch (error) {
+      // The original procedural vehicle remains as a safe visual fallback.
+      console.warn('[Engine] Detailed vehicle model unavailable; using procedural car.', error);
+    }
+  }
+
+  private updateExternalVehiclePaint(customization: CarCustomization) {
+    this.externalPrimaryPaint.forEach((material) => {
+      material.color.set(customization.bodyColor);
+    });
+    this.externalSecondaryPaint.forEach((material) => {
+      material.color.set(customization.bodyColor).multiplyScalar(0.22);
+    });
+  }
+
   public updateCustomization(customization: CarCustomization) {
     this.carRig.updateCustomization(customization);
+    this.updateExternalVehiclePaint(customization);
   }
 
   public startRace(track: RaceTrack, bestTimeMs?: number) {
@@ -373,6 +532,13 @@ export class GameEngine {
       this.physics.pitch,
       this.physics.roll
     );
+    if (this.externalVehicleModel) {
+      this.externalVehicleModel.rotation.x = this.physics.pitch;
+      this.externalVehicleModel.rotation.z = this.physics.roll;
+    }
+    this.externalWheelMeshes.forEach((wheel) => {
+      wheel.rotation.y += wheelSpinDelta;
+    });
 
     // Update Dynamic Third-Person Camera
     this.updateChaseCamera(delta, telemetry);
@@ -456,6 +622,10 @@ export class GameEngine {
     this.carRig.carGroup.position.set(0, 0.38, 0);
     this.carRig.carGroup.rotation.set(0, 0, 0);
     this.carRig.updateState(0, 0, false, false, 0, 0);
+    if (this.externalVehicleModel) {
+      this.externalVehicleModel.rotation.x = 0;
+      this.externalVehicleModel.rotation.z = 0;
+    }
   }
 
   private afterDraw(cb: () => void) {
@@ -476,6 +646,7 @@ export class GameEngine {
 
   public dispose() {
     this.isDestroyed = true;
+    this.externalVehicleLoadId++;
     cancelAnimationFrame(this.animationFrameId);
     clearTimeout(this.animationFrameId);
     window.removeEventListener('resize', this.onWindowResize);
