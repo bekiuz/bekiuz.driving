@@ -390,9 +390,9 @@ export class GameEngine {
 
     // Look-at point slightly ahead of the car
     const lookAheadDist = 4.0;
-    const lookTargetX = carPos.x + Math.sin(carHeading) * lookAheadDist;
+    const lookTargetX = carPos.x + Math.sin(effectiveHeading) * lookAheadDist;
     const lookTargetY = carPos.y + lookHeight;
-    const lookTargetZ = carPos.z + Math.cos(carHeading) * lookAheadDist;
+    const lookTargetZ = carPos.z + Math.cos(effectiveHeading) * lookAheadDist;
 
     this.cameraLookTarget.x = THREE.MathUtils.damp(this.cameraLookTarget.x, lookTargetX, dampRate, delta);
     this.cameraLookTarget.y = THREE.MathUtils.damp(this.cameraLookTarget.y, lookTargetY, dampRate, delta);
