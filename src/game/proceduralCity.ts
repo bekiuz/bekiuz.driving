@@ -226,16 +226,25 @@ export function createProceduralCity(): CityEnvironment {
     mesh.receiveShadow = true;
     sceneGroup.add(mesh);
 
-    // Sidewalks along both sides
+    // Place sidewalks along the road's rotated local X axis.
     const curbW = 2.4;
     const curbH = 0.2;
+    const sideOffset = w / 2 + curbW / 2;
     const sideL = new THREE.Mesh(new THREE.BoxGeometry(curbW, curbH, l), sidewalkMat);
-    sideL.position.set(x - w / 2 - curbW / 2, curbH / 2, z);
+    sideL.position.set(
+      x - Math.cos(rotY) * sideOffset,
+      curbH / 2,
+      z + Math.sin(rotY) * sideOffset
+    );
     sideL.rotation.y = rotY;
     sideL.receiveShadow = true;
 
     const sideR = new THREE.Mesh(new THREE.BoxGeometry(curbW, curbH, l), sidewalkMat);
-    sideR.position.set(x + w / 2 + curbW / 2, curbH / 2, z);
+    sideR.position.set(
+      x + Math.cos(rotY) * sideOffset,
+      curbH / 2,
+      z - Math.sin(rotY) * sideOffset
+    );
     sideR.rotation.y = rotY;
     sideR.receiveShadow = true;
 
@@ -251,57 +260,91 @@ export function createProceduralCity(): CityEnvironment {
   addRoad(-20, 0, roadWidth, 360, Math.PI / 2);
 
   // North Perimeter Avenue (Z = -155, X: -200 to 180)
-  addRoad(-10, -155, roadWidth, 380, Math.PI / 2);
+  addRoad(-10, -160, roadWidth, 380, Math.PI / 2);
 
   // South Perimeter / Waterfront Promenade (Z = 160, X: -200 to 180)
   addRoad(-10, 160, roadWidth, 380, Math.PI / 2);
 
   // West Outer Highway (X = -195, Z: -155 to 160)
-  addRoad(-195, 2.5, roadWidth, 315, 0);
+  addRoad(-195, 0, roadWidth, 320, 0);
 
   // Middle Avenue (X = -90, Z: -155 to 160)
-  addRoad(-90, 2.5, roadWidth, 315, 0);
+  addRoad(-90, 0, roadWidth, 320, 0);
 
   // Middle East Avenue (X = 90, Z: -155 to 160)
-  addRoad(90, 2.5, roadWidth, 315, 0);
+  addRoad(90, 0, roadWidth, 320, 0);
 
   // ==========================================
   // 3. ELEVATED SUSPENSION BRIDGE (Over Water Channel)
   // ==========================================
   const bridgeX = 195;
-  const bridgeStartZ = -155;
-  const bridgeEndZ = 160;
+  const bridgeStartZ = -150;
+  const bridgeEndZ = 150;
   const bridgeLength = bridgeEndZ - bridgeStartZ;
+  const rampLength = 35;
+  const bridgeDeckLength = bridgeLength - rampLength * 2;
+  const rampAngle = Math.atan2(5.2, rampLength);
 
-  // Bridge Deck
+  // The flat deck stops exactly where the two approach ramps begin.
   const bridgeDeck = new THREE.Mesh(
-    new THREE.BoxGeometry(roadWidth + 4, 1.2, bridgeLength),
+    new THREE.BoxGeometry(roadWidth + 4, 1.2, bridgeDeckLength),
     bridgeSteelMat
   );
-  bridgeDeck.position.set(bridgeX, 5.0, 2.5);
+  bridgeDeck.position.set(bridgeX, 5.0, 0);
   bridgeDeck.receiveShadow = true;
   bridgeDeck.castShadow = true;
   sceneGroup.add(bridgeDeck);
 
-  // Road surface on bridge
-  const bridgeRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, bridgeLength), roadMat);
-  bridgeRoad.rotateX(-Math.PI / 2);
-  bridgeRoad.position.set(bridgeX, 5.62, 2.5);
+  const bridgeRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, bridgeDeckLength), roadMat);
+  bridgeRoad.rotation.x = -Math.PI / 2;
+  bridgeRoad.position.set(bridgeX, 5.62, 0);
+  bridgeRoad.receiveShadow = true;
   sceneGroup.add(bridgeRoad);
 
-  // Bridge Approaches (Incline ramps at ends)
-  const rampLength = 35;
-  const rampSouth = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 4, 1, rampLength), bridgeSteelMat);
-  rampSouth.position.set(bridgeX, 2.8, 160 - rampLength / 2);
-  // South approach rises as Z decreases toward the bridge deck.
-  rampSouth.rotation.x = 0.14;
-  sceneGroup.add(rampSouth);
+  // Each approach is a sloped structure with an asphalt driving surface and guard rails.
+  const createBridgeApproach = (z: number, angle: number) => {
+    const approach = new THREE.Group();
+    approach.position.set(bridgeX, 2.51, z);
+    approach.rotation.x = angle;
 
-  const rampNorth = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 4, 1, rampLength), bridgeSteelMat);
-  rampNorth.position.set(bridgeX, 2.8, -155 + rampLength / 2);
-  // North approach rises as Z increases toward the bridge deck.
-  rampNorth.rotation.x = -0.14;
-  sceneGroup.add(rampNorth);
+    const rampDeck = new THREE.Mesh(
+      new THREE.BoxGeometry(roadWidth + 4, 1, rampLength),
+      bridgeSteelMat
+    );
+    approach.add(rampDeck);
+
+    const rampRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, rampLength), roadMat);
+    rampRoad.rotation.x = -Math.PI / 2;
+    rampRoad.position.y = 0.501;
+    rampRoad.receiveShadow = true;
+    approach.add(rampRoad);
+
+    const railL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, rampLength), barrierMat);
+    railL.position.set(-(roadWidth / 2 + 1), 1.3, 0);
+    const railR = railL.clone();
+    railR.position.x = roadWidth / 2 + 1;
+    approach.add(railL, railR);
+    sceneGroup.add(approach);
+
+    collisionBoxes.push(
+      new THREE.Box3().setFromObject(railL),
+      new THREE.Box3().setFromObject(railR)
+    );
+  };
+
+  // South ramp rises from the promenade into the bridge deck.
+  createBridgeApproach(bridgeEndZ - rampLength / 2, rampAngle);
+  // North ramp descends from the bridge deck to the north avenue.
+  createBridgeApproach(bridgeStartZ + rampLength / 2, -rampAngle);
+
+  // Short paved links close the 3 m gap between the perimeter roads and bridge deck.
+  const southLink = new THREE.Mesh(new THREE.PlaneGeometry(3, roadWidth), roadMat);
+  southLink.rotation.x = -Math.PI / 2;
+  southLink.rotation.y = Math.PI / 2;
+  southLink.position.set(181.5, 0.01, bridgeEndZ + 10);
+  const northLink = southLink.clone();
+  northLink.position.z = bridgeStartZ - 10;
+  sceneGroup.add(southLink, northLink);
 
   // Bridge Towers (2 massive A-frame suspension towers)
   const towerZPositions = [-50, 55];
@@ -330,7 +373,7 @@ export function createProceduralCity(): CityEnvironment {
 
   // Suspension Cables (diagonal tubular lines)
   const cableMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
-  for (let c = -120; c <= 120; c += 25) {
+  for (let c = -100; c <= 100; c += 25) {
     const cableL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 26), cableMat);
     cableL.position.set(bridgeX - (roadWidth / 2 + 2.5), 16, c);
     const cableR = cableL.clone();
@@ -338,13 +381,12 @@ export function createProceduralCity(): CityEnvironment {
     sceneGroup.add(cableL, cableR);
   }
 
-  // Guard Rails on Bridge
-  const railL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, bridgeLength), barrierMat);
-  railL.position.set(bridgeX - (roadWidth / 2 + 1), 6.4, 2.5);
-  const railR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, bridgeLength), barrierMat);
-  railR.position.set(bridgeX + (roadWidth / 2 + 1), 6.4, 2.5);
+  // Guard rails on the level bridge deck.
+  const railL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, bridgeDeckLength), barrierMat);
+  railL.position.set(bridgeX - (roadWidth / 2 + 1), 6.2, 0);
+  const railR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, bridgeDeckLength), barrierMat);
+  railR.position.set(bridgeX + (roadWidth / 2 + 1), 6.2, 0);
   sceneGroup.add(railL, railR);
-  // Physical collision for both bridge guard rails.
   collisionBoxes.push(
     new THREE.Box3().setFromObject(railL),
     new THREE.Box3().setFromObject(railR)
@@ -534,7 +576,7 @@ export function createProceduralCity(): CityEnvironment {
   const treeCoords: Array<[number, number]> = [
     [-13, 25], [-13, 65], [-13, 105], [13, 25], [13, 65], [13, 105],
     [-77, 25], [-77, 65], [-77, 105], [77, 25], [77, 65], [77, 105],
-    [-150, 145], [-110, 145], [-70, 145], [-30, 145], [30, 145], [70, 145],
+    [-150, 174], [-110, 174], [-70, 174], [-30, 174], [30, 174], [70, 174],
   ];
 
   treeCoords.forEach(([tx, tz]) => {
