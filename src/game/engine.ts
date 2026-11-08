@@ -9,6 +9,7 @@ import { CarConfig, CarCustomization, CarUpgrades, InputControls, RaceTrack, Veh
 import { createProceduralCar, CarVisualRig } from './proceduralCar';
 import { createProceduralCity, CityEnvironment } from './proceduralCity';
 import { TrafficSystem } from './traffic';
+import { PolicePursuit } from './policePursuit';
 import { VehiclePhysics } from './vehiclePhysics';
 import { RaceManager, RaceManagerState } from './raceManager';
 import { soundManager } from '../services/audio';
@@ -29,6 +30,7 @@ export class GameEngine {
   public physics: VehiclePhysics;
   public raceManager: RaceManager | null = null;
   private traffic: TrafficSystem;
+  private police: PolicePursuit;
 
   private container: HTMLDivElement;
   private isSoftwareGl = false;
@@ -144,6 +146,7 @@ export class GameEngine {
     this.scene.add(this.carRig.carGroup);
 
     this.physics = new VehiclePhysics(carConfig, carUpgrades, this.city, [0, 0.4, 0], 0);
+    this.police = new PolicePursuit(carConfig, this.scene);
 
     // Window Resize Handler
     window.addEventListener('resize', this.onWindowResize);
@@ -183,7 +186,9 @@ export class GameEngine {
 
   public setScreenMode(screen: GameScreen) {
     this.currentScreen = screen;
-    if (screen === 'free_drive' || screen === 'racing') {
+    const isDriving = screen === 'free_drive' || screen === 'racing';
+    this.police.setActive(isDriving, this.physics.position, this.physics.rotationY);
+    if (isDriving) {
       soundManager.startEngine();
     } else {
       soundManager.stopEngine();
@@ -306,6 +311,7 @@ export class GameEngine {
 
     // Physics step
     const telemetry = this.physics.update(delta, effectiveInput);
+    this.police.update(delta, this.physics.position, this.physics.rotationY);
     this.onTelemetryUpdate(telemetry);
 
     // Race update
@@ -439,6 +445,7 @@ export class GameEngine {
     soundManager.stopEngine();
 
     this.carRig.dispose();
+    this.police.dispose();
     this.traffic.dispose();
     this.scene.remove(this.traffic.group);
     this.city.dispose();
