@@ -9,6 +9,7 @@ import { TrackCheckpoint } from '../types/game';
 interface MinimapProps {
   carPosition: [number, number, number];
   carRotationY: number;
+  policePosition?: [number, number, number];
   checkpoints?: TrackCheckpoint[];
   activeCheckpointIndex?: number;
 }
@@ -16,6 +17,7 @@ interface MinimapProps {
 export const Minimap: React.FC<MinimapProps> = ({
   carPosition,
   carRotationY,
+  policePosition,
   checkpoints,
   activeCheckpointIndex,
 }) => {
@@ -122,6 +124,23 @@ export const Minimap: React.FC<MinimapProps> = ({
       });
     }
 
+    // Police marker: red/blue flashing ring behind the player.
+    if (policePosition) {
+      const [policeX, policeY] = worldToMap(policePosition[0], policePosition[2]);
+      const pulse = 4 + (Math.sin(performance.now() / 140) + 1) * 1.5;
+      ctx.beginPath();
+      ctx.arc(policeX, policeY, pulse + 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(policeX, policeY, pulse, 0, Math.PI * 2);
+      ctx.fillStyle = Math.sin(performance.now() / 110) > 0 ? '#ef4444' : '#3b82f6';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
     // Draw Player Car Icon (Triangle pointing in heading)
     const [px, py] = worldToMap(carPosition[0], carPosition[2]);
     ctx.save();
@@ -142,7 +161,7 @@ export const Minimap: React.FC<MinimapProps> = ({
 
     ctx.restore();
     ctx.restore();
-  }, [carPosition, carRotationY, checkpoints, activeCheckpointIndex]);
+  }, [carPosition, carRotationY, policePosition, checkpoints, activeCheckpointIndex]);
 
   return (
     <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden shadow-2xl border border-cyan-500/30">
