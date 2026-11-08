@@ -178,53 +178,55 @@ export const Garage: React.FC<GarageProps> = ({
         </div>
       </div>
 
-      {/* Middle Center: Car Switcher Arrows & Name */}
+      {/* Vehicle title and purchase action sit above the 3D preview, not over the car. */}
+      <div className="absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 w-[min(92vw,520px)] flex flex-col items-center text-center pointer-events-auto z-10">
+        <span className="text-[10px] sm:text-[11px] font-race text-cyan-400 font-bold uppercase tracking-widest px-2.5 py-0.5 rounded bg-slate-900/80 border border-cyan-500/30">
+          {previewCar.category}
+        </span>
+        <h2 className="font-race font-black text-xl sm:text-3xl text-white tracking-wide mt-1 drop-shadow-lg">
+          {previewCar.name}
+        </h2>
+
+        <div className="mt-2">
+          {!isUnlocked ? (
+            <button
+              onClick={handleBuy}
+              disabled={profile.currency < previewCar.price}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-race font-black text-xs sm:text-sm flex items-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95"
+            >
+              <Lock className="w-4 h-4" />
+              <span>UNLOCK FOR ${previewCar.price.toLocaleString()}</span>
+            </button>
+          ) : isSelected ? (
+            <div className="px-4 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-race font-bold text-[10px] sm:text-xs flex items-center gap-1.5 shadow-lg">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>SELECTED VEHICLE</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleSelect}
+              className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-race font-black text-xs sm:text-sm shadow-[0_0_20px_rgba(6,182,212,0.5)] active:scale-95"
+            >
+              SELECT VEHICLE
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Keep the switch arrows at the vehicle's midline and leave its center unobstructed. */}
       <div className="flex justify-between items-center px-2 pointer-events-auto my-auto">
         <button
           onClick={handlePrevCar}
-          className="w-12 h-12 rounded-full glass-panel border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xl active:scale-90"
+          aria-label="Previous vehicle"
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full glass-panel border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xl active:scale-90"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
 
-        <div className="flex flex-col items-center text-center">
-          <span className="text-[11px] font-race text-cyan-400 font-bold uppercase tracking-widest px-2.5 py-0.5 rounded bg-slate-900/80 border border-cyan-500/30">
-            {previewCar.category}
-          </span>
-          <h2 className="font-race font-black text-3xl sm:text-4xl text-white tracking-wide mt-1">
-            {previewCar.name}
-          </h2>
-
-          {/* Action: Select or Buy */}
-          <div className="mt-3">
-            {!isUnlocked ? (
-              <button
-                onClick={handleBuy}
-                disabled={profile.currency < previewCar.price}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-race font-black text-sm flex items-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95"
-              >
-                <Lock className="w-4 h-4" />
-                <span>UNLOCK FOR ${previewCar.price.toLocaleString()}</span>
-              </button>
-            ) : isSelected ? (
-              <div className="px-5 py-2 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-race font-bold text-xs flex items-center gap-1.5 shadow-lg">
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>SELECTED VEHICLE</span>
-              </div>
-            ) : (
-              <button
-                onClick={handleSelect}
-                className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-race font-black text-sm shadow-[0_0_20px_rgba(6,182,212,0.5)] active:scale-95"
-              >
-                SELECT VEHICLE
-              </button>
-            )}
-          </div>
-        </div>
-
         <button
           onClick={handleNextCar}
-          className="w-12 h-12 rounded-full glass-panel border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xl active:scale-90"
+          aria-label="Next vehicle"
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full glass-panel border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xl active:scale-90"
         >
           <ChevronRight className="w-6 h-6" />
         </button>

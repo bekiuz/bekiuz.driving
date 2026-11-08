@@ -45,6 +45,9 @@ export class GameEngine {
   private cameraTargetPos = new THREE.Vector3();
   private cameraLookTarget = new THREE.Vector3();
   private garageOrbitAngle = 0;
+  private showroomOrbitRadius = 8.5;
+  private showroomCameraLift = 2.2;
+  private showroomLookTarget = new THREE.Vector3(0, 0.35, 0);
 
   // Wheel spin accumulator
   private wheelSpin = 0;
@@ -144,6 +147,8 @@ export class GameEngine {
     // 7. Car Visual Rig & Physics
     this.carRig = createProceduralCar(carConfig, customization);
     this.scene.add(this.carRig.carGroup);
+    this.carRig.carGroup.position.set(0, 0.38, 0);
+    this.updateShowroomFraming();
 
     this.physics = new VehiclePhysics(carConfig, carUpgrades, this.city, [0, 0.4, 0], 0);
     this.police = new PolicePursuit(carConfig, this.scene);
@@ -211,6 +216,9 @@ export class GameEngine {
     // Create new car visual rig
     this.carRig = createProceduralCar(config, customization);
     this.scene.add(this.carRig.carGroup);
+    this.carRig.carGroup.position.set(0, 0.38, 0);
+    this.carRig.carGroup.rotation.set(0, 0, 0);
+    this.updateShowroomFraming();
 
     // Re-initialize physics with new car parameters
     const currentPos = this.physics.position.toArray() as [number, number, number];
@@ -268,7 +276,35 @@ export class GameEngine {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    if (this.currentScreen !== 'free_drive' && this.currentScreen !== 'racing') {
+      this.updateShowroomFraming();
+    }
   };
+
+  private updateShowroomFraming() {
+    // Fit the full vehicle (including mirrors, wheels and bodywork) inside the preview.
+    this.carRig.carGroup.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(this.carRig.carGroup);
+    if (bounds.isEmpty()) return;
+
+    const size = bounds.getSize(new THREE.Vector3());
+    const sphere = bounds.getBoundingSphere(new THREE.Sphere());
+    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const aspect = Math.max(0.1, this.camera.aspect);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+    const limitingFov = Math.max(0.25, Math.min(verticalFov, horizontalFov));
+
+    // The bounding sphere prevents long cars being clipped as the camera rotates around them.
+    this.showroomOrbitRadius = Math.max(
+      7.8,
+      (sphere.radius / Math.sin(limitingFov / 2)) * 1.1
+    );
+
+    this.showroomLookTarget.copy(sphere.center);
+    // Raise the vehicle in the available preview area so the bottom upgrade panel cannot cover it.
+    this.showroomLookTarget.y -= Math.max(0.28, size.y * 0.3);
+    this.showroomCameraLift = Math.max(2.0, size.y * 1.45);
+  }
 
   private tick = () => {
     if (this.isDestroyed) return;
@@ -404,15 +440,17 @@ export class GameEngine {
   private updateShowroom(delta: number) {
     // Smooth turntable orbit around the car in Garage / Menu
     this.garageOrbitAngle += delta * 0.35;
-    const orbitRadius = 6.8;
-    const camHeight = 1.9 + Math.sin(this.garageOrbitAngle * 0.5) * 0.3;
+    const camHeight =
+      this.showroomLookTarget.y +
+      this.showroomCameraLift +
+      Math.sin(this.garageOrbitAngle * 0.5) * 0.18;
 
     this.camera.position.set(
-      Math.sin(this.garageOrbitAngle) * orbitRadius,
+      Math.sin(this.garageOrbitAngle) * this.showroomOrbitRadius,
       camHeight,
-      Math.cos(this.garageOrbitAngle) * orbitRadius
+      Math.cos(this.garageOrbitAngle) * this.showroomOrbitRadius
     );
-    this.camera.lookAt(0, 0.7, 0);
+    this.camera.lookAt(this.showroomLookTarget);
 
     // Stationary car positioning
     this.carRig.carGroup.position.set(0, 0.38, 0);
