@@ -298,49 +298,84 @@ export class VehiclePhysics {
       this.isGrounded = true;
     }
 
-    // City Boundary Collisions
+    // Static world collisions (buildings, tunnel walls, bridge rails, poles and tree trunks).
+    // Use a yaw-aware vehicle AABB and a swept box so thin posts are not skipped at speed.
+    const halfWidth = this.config.dimensions.width * 0.5 + 0.08;
+    const halfLength = this.config.dimensions.length * 0.5 + 0.08;
+    const sinYaw = Math.abs(Math.sin(this.rotationY));
+    const cosYaw = Math.abs(Math.cos(this.rotationY));
+    const halfX = cosYaw * halfWidth + sinYaw * halfLength;
+    const halfZ = sinYaw * halfWidth + cosYaw * halfLength;
+    const createCarBox = (position: THREE.Vector3) =>
+      new THREE.Box3(
+        new THREE.Vector3(position.x - halfX, position.y - 0.25, position.z - halfZ),
+        new THREE.Vector3(position.x + halfX, position.y + this.config.dimensions.height + 0.35, position.z + halfZ)
+      );
+
+    const currentBox = createCarBox(this.position);
+    const predictedPosition = this.position.clone().addScaledVector(this.velocity, dt);
+    const predictedBox = createCarBox(predictedPosition);
+
+    // World perimeter: stop the car before its body passes through the invisible city boundary.
     const { roadBounds } = this.city;
-    const carRadius = 1.6;
+    const safeMinX = roadBounds.minX + halfX;
+    const safeMaxX = roadBounds.maxX - halfX;
+    const safeMinZ = roadBounds.minZ + halfZ;
+    const safeMaxZ = roadBounds.maxZ - halfZ;
+    const boundaryHit =
+      predictedPosition.x < safeMinX ||
+      predictedPosition.x > safeMaxX ||
+      predictedPosition.z < safeMinZ ||
+      predictedPosition.z > safeMaxZ ||
+      currentBox.min.x < roadBounds.minX ||
+      currentBox.max.x > roadBounds.maxX ||
+      currentBox.min.z < roadBounds.minZ ||
+      currentBox.max.z > roadBounds.maxZ;
 
-    if (this.position.x < roadBounds.minX + carRadius) {
-      this.position.x = roadBounds.minX + carRadius;
-      this.velocity.x *= -0.4;
-      this.forwardSpeed *= 0.7;
-      soundManager.playCrashSound(0.4);
-    } else if (this.position.x > roadBounds.maxX - carRadius) {
-      this.position.x = roadBounds.maxX - carRadius;
-      this.velocity.x *= -0.4;
-      this.forwardSpeed *= 0.7;
-      soundManager.playCrashSound(0.4);
-    }
+    if (boundaryHit) {
+      this.position.x = THREE.MathUtils.clamp(this.position.x, safeMinX, safeMaxX);
+      this.position.z = THREE.MathUtils.clamp(this.position.z, safeMinZ, safeMaxZ);
+      const impactSpeed = Math.abs(this.forwardSpeed);
+      this.forwardSpeed *= -0.12;
+      this.velocity.x = this._forward.x * this.forwardSpeed;
+      this.velocity.z = this._forward.z * this.forwardSpeed;
+      if (impactSpeed > 1.5) {
+        soundManager.playCrashSound(Math.min(1.0, impactSpeed / 30));
+      }
+    } else {
+      // Swept collision catches narrow obstacles even when the car moves several metres in one frame.
+      const sweptBox = currentBox.clone().union(predictedBox);
 
-    if (this.position.z < roadBounds.minZ + carRadius) {
-      this.position.z = roadBounds.minZ + carRadius;
-      this.velocity.z *= -0.4;
-      this.forwardSpeed *= 0.7;
-      soundManager.playCrashSound(0.4);
-    } else if (this.position.z > roadBounds.maxZ - carRadius) {
-      this.position.z = roadBounds.maxZ - carRadius;
-      this.velocity.z *= -0.4;
-      this.forwardSpeed *= 0.7;
-      soundManager.playCrashSound(0.4);
-    }
+      for (const obstacleBox of this.city.collisionBoxes) {
+        if (!sweptBox.intersectsBox(obstacleBox)) continue;
 
-    // Building Collision Boxes
-    const carBox = new THREE.Box3().setFromCenterAndSize(
-      this.position,
-      new THREE.Vector3(2.0, 1.4, 4.2)
-    );
+        // If already overlapping, move the car out along the shallowest horizontal penetration.
+        if (currentBox.intersectsBox(obstacleBox)) {
+          const overlapX =
+            Math.min(currentBox.max.x, obstacleBox.max.x) -
+            Math.max(currentBox.min.x, obstacleBox.min.x);
+          const overlapZ =
+            Math.min(currentBox.max.z, obstacleBox.max.z) -
+            Math.max(currentBox.min.z, obstacleBox.min.z);
+          const obstacleCenter = obstacleBox.getCenter(new THREE.Vector3());
 
-    for (const bBox of this.city.collisionBoxes) {
-      if (bBox.intersectsBox(carBox)) {
-        // Elastic rebound
-        const speed = Math.abs(this.forwardSpeed);
-        this.forwardSpeed = -this.forwardSpeed * 0.35;
-        this.velocity.multiplyScalar(-0.4);
-        soundManager.playCrashSound(Math.min(1.0, speed / 30));
-        // Push slightly back
-        this.position.addScaledVector(this._forward, -Math.sign(this.forwardSpeed) * 0.8);
+          if (overlapX <= overlapZ) {
+            const direction = this.position.x < obstacleCenter.x ? -1 : 1;
+            this.position.x += direction * (overlapX + 0.08);
+          } else {
+            const direction = this.position.z < obstacleCenter.z ? -1 : 1;
+            this.position.z += direction * (overlapZ + 0.08);
+          }
+        }
+
+        // Strongly slow and rebound away from the obstacle; do not push the car deeper into it.
+        const impactSpeed = Math.abs(this.forwardSpeed);
+        this.forwardSpeed *= -0.12;
+        this.velocity.x = this._forward.x * this.forwardSpeed;
+        this.velocity.z = this._forward.z * this.forwardSpeed;
+        if (impactSpeed > 1.5) {
+          soundManager.playCrashSound(Math.min(1.0, impactSpeed / 30));
+        }
         break;
       }
     }
