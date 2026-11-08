@@ -56,7 +56,7 @@ export class GameEngine {
   // Optional CC0 GLB visual for the four premium garage cars.
   private externalVehicleLoadId = 0;
   private externalVehicleModel: THREE.Group | null = null;
-  private externalWheelMeshes: THREE.Object3D[] = [];
+  private externalWheelMeshes: { mesh: THREE.Object3D; axis: 'x' | 'y' }[] = [];
   private externalPrimaryPaint: THREE.MeshStandardMaterial[] = [];
   private externalSecondaryPaint: THREE.MeshStandardMaterial[] = [];
 
@@ -256,10 +256,21 @@ export class GameEngine {
     this.externalPrimaryPaint = [];
     this.externalSecondaryPaint = [];
 
-    const premiumStyles = ['bmw_m4', 'mercedes_amg', 'bugatti_chiron', 'ferrari_488'];
-    if (!premiumStyles.includes(config.style)) return;
+    const assetBase =
+      'https://cdn.jsdelivr.net/gh/nutricionistaalmeidavh-spec/assetscarros3d@3eb0f1afac277d81bca7b7f643de81915ea76965/assets/';
+    const sourceFiles: Record<string, string> = {
+      bmw_m4: 'bmw-g82-m4.glb',
+      mercedes_amg: 'mercedes-benz-amg-gt.glb',
+      bugatti_chiron: 'bugatti-chiron.glb',
+      ferrari_488: 'ferrari-488.glb',
+    };
+    const modelFile = sourceFiles[config.style];
+    if (!modelFile) return;
 
     const urls = [
+      assetBase + modelFile,
+      'https://raw.githubusercontent.com/nutricionistaalmeidavh-spec/assetscarros3d/3eb0f1afac277d81bca7b7f643de81915ea76965/assets/' + modelFile,
+      // A detailed CC0 sports car stays available as a fallback if a brand model CDN is unavailable.
       'https://cdn.jsdelivr.net/gh/JaronKBragg7337/spectral-gt-rs@main/spectral_gt_rs_game_ready.glb',
       'https://jaronkbragg7337.github.io/spectral-gt-rs/spectral_gt_rs_game_ready.glb',
     ];
@@ -268,10 +279,12 @@ export class GameEngine {
       const loader = new GLTFLoader();
       let gltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
       let lastError: unknown = null;
+      let loadedUrl = '';
 
       for (const url of urls) {
         try {
           gltf = await loader.loadAsync(url);
+          loadedUrl = url;
           break;
         } catch (error) {
           lastError = error;
@@ -281,20 +294,29 @@ export class GameEngine {
       if (!gltf) throw lastError ?? new Error('Vehicle model could not be loaded.');
 
       const model = gltf.scene;
-      model.name = 'CC0_Detailed_Sports_Car';
-      // The asset's documented front axis is +X; the game uses +Z.
-      model.rotation.y = -Math.PI / 2;
+      model.name = config.id === 'bmw_m4' ? 'BMW_G82_M4' :
+        config.id === 'mercedes_amg' ? 'Mercedes_AMG_GT' :
+        config.id === 'bugatti_chiron' ? 'Bugatti_Chiron' :
+        config.id === 'ferrari_488' ? 'Ferrari_488_Pista' : 'Detailed_Sports_Car';
+
+      // glTF cars may be authored lengthwise on X or Z. Normalize the long axis
+      // to the game's +Z direction before fitting the model to the car dimensions.
+      model.updateMatrixWorld(true);
+      const sourceBounds = new THREE.Box3().setFromObject(model);
+      const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+      const longitudinalAxis: 'x' | 'z' = sourceSize.x > sourceSize.z ? 'x' : 'z';
+      model.rotation.y = longitudinalAxis === 'x' ? -Math.PI / 2 : 0;
       model.updateMatrixWorld(true);
 
       const bounds = new THREE.Box3().setFromObject(model);
       const size = bounds.getSize(new THREE.Vector3());
-      if (!Number.isFinite(size.z) || size.z < 0.1) {
+      const lengthOnZ = size.z;
+      if (!Number.isFinite(lengthOnZ) || lengthOnZ < 0.1) {
         throw new Error('Loaded vehicle has invalid dimensions.');
       }
 
-      // Keep the model close to the configured vehicle length and center it on
-      // the physics origin while preserving the asset's original proportions.
-      const scale = config.dimensions.length / size.z;
+      // Fit by real car length and place the tyres on the road plane.
+      const scale = config.dimensions.length / lengthOnZ;
       const center = bounds.getCenter(new THREE.Vector3());
       model.scale.setScalar(scale);
       model.position.set(
@@ -306,7 +328,14 @@ export class GameEngine {
 
       const primaryPaint: THREE.MeshStandardMaterial[] = [];
       const secondaryPaint: THREE.MeshStandardMaterial[] = [];
-      const wheels: THREE.Object3D[] = [];
+      const wheels: { mesh: THREE.Object3D; axis: 'x' | 'y' }[] = [];
+      const paintNamePatterns: Record<string, RegExp[]> = {
+        bugatti_chiron: [/meshpart128mtl/i],
+        ferrari_488: [/green_car_paint/i, /car.?paint/i, /body.?paint/i],
+        bmw_m4: [/paint_m4/i, /car.?paint/i, /body.?paint/i],
+        mercedes_amg: [/amg.?paint/i, /car.?paint/i, /body.?paint/i],
+      };
+      const primaryPatterns = paintNamePatterns[config.style] ?? [];
 
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -321,14 +350,12 @@ export class GameEngine {
           const material = source.clone();
           const materialName = material.name.toLowerCase();
 
-          if (material instanceof THREE.MeshStandardMaterial) {
-            if (materialName.includes('spectral blue')) {
-              material.color.set(customization.bodyColor);
-              primaryPaint.push(material);
-            } else if (materialName.includes('midnight blue')) {
-              material.color.set(customization.bodyColor).multiplyScalar(0.22);
-              secondaryPaint.push(material);
-            }
+          if (
+            material instanceof THREE.MeshStandardMaterial &&
+            primaryPatterns.some((pattern) => pattern.test(materialName))
+          ) {
+            material.color.set(customization.bodyColor);
+            primaryPaint.push(material);
           }
 
           return material;
@@ -338,8 +365,17 @@ export class GameEngine {
           ? clonedMaterials
           : clonedMaterials[0];
 
-        if (object.name.toLowerCase().endsWith('_tire')) {
-          wheels.push(object);
+        const nodeName = object.name.toLowerCase();
+        if (
+          !/steering/i.test(nodeName) &&
+          /(tire|tyre|rim|wheel)/i.test(nodeName)
+        ) {
+          wheels.push({
+            mesh: object,
+            // Wheels on X-longitudinal source meshes spin around local Y;
+            // wheels on Z-longitudinal meshes spin around local X.
+            axis: longitudinalAxis === 'x' ? 'y' : 'x',
+          });
         }
       });
 
@@ -358,9 +394,10 @@ export class GameEngine {
         return;
       }
 
+      // Hide all primitive bodywork and all four procedural wheel assemblies.
       this.carRig.chassisMesh.visible = false;
-      this.carRig.frontWheelPivots.forEach((pivot) => {
-        pivot.visible = false;
+      this.carRig.wheelMeshes.forEach((wheel) => {
+        if (wheel.parent) wheel.parent.visible = false;
       });
       this.carRig.carGroup.add(model);
 
@@ -369,6 +406,7 @@ export class GameEngine {
       this.externalPrimaryPaint = primaryPaint;
       this.externalSecondaryPaint = secondaryPaint;
       this.updateShowroomFraming();
+      console.info('[Engine] Loaded detailed vehicle:', model.name, loadedUrl);
     } catch (error) {
       // The original procedural vehicle remains as a safe visual fallback.
       console.warn('[Engine] Detailed vehicle model unavailable; using procedural car.', error);
@@ -536,8 +574,8 @@ export class GameEngine {
       this.externalVehicleModel.rotation.x = this.physics.pitch;
       this.externalVehicleModel.rotation.z = this.physics.roll;
     }
-    this.externalWheelMeshes.forEach((wheel) => {
-      wheel.rotation.y += wheelSpinDelta;
+    this.externalWheelMeshes.forEach(({ mesh, axis }) => {
+      mesh.rotation[axis] += wheelSpinDelta;
     });
 
     // Update Dynamic Third-Person Camera
