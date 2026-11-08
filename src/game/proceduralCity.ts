@@ -342,6 +342,11 @@ export function createProceduralCity(): CityEnvironment {
   const railR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, bridgeLength), barrierMat);
   railR.position.set(bridgeX + (roadWidth / 2 + 1), 6.4, 2.5);
   sceneGroup.add(railL, railR);
+  // Physical collision for both bridge guard rails.
+  collisionBoxes.push(
+    new THREE.Box3().setFromObject(railL),
+    new THREE.Box3().setFromObject(railR)
+  );
 
   // ==========================================
   // 4. UNDERGROUND / ENCLOSED TUNNEL SECTION
@@ -509,6 +514,13 @@ export function createProceduralCity(): CityEnvironment {
     head.position.set(lx > 0 ? lx - 0.5 : lx + 0.5, 7, lz);
 
     sceneGroup.add(pole, head);
+    // Streetlight pole collider (the lamp head is above the vehicle).
+    collisionBoxes.push(
+      new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(lx, 3.5, lz),
+        new THREE.Vector3(0.5, 7, 0.5)
+      )
+    );
   });
 
   // Trees along sidewalks & parks
@@ -532,6 +544,13 @@ export function createProceduralCity(): CityEnvironment {
     foliage.castShadow = true;
 
     sceneGroup.add(trunk, foliage);
+    // Tree trunk collider; foliage remains non-solid.
+    collisionBoxes.push(
+      new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(tx, 1.5, tz),
+        new THREE.Vector3(0.9, 3, 0.9)
+      )
+    );
   });
 
   // ==========================================
