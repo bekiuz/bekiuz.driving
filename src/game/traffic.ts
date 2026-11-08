@@ -58,7 +58,7 @@ export class TrafficSystem {
   private readonly routes: TrafficRoute[];
   private readonly cars: TrafficCar[] = [];
   private readonly signals: SignalVisual[] = [];
-  private readonly elapsed = 0;
+  private elapsed = 0;
 
   private readonly bodyGeometry = new THREE.BoxGeometry(2.05, 0.68, 4.25);
   private readonly cabinGeometry = new THREE.BoxGeometry(1.55, 0.66, 2.05);
@@ -369,7 +369,7 @@ export class TrafficSystem {
   public update(delta: number) {
     const dt = Math.min(Math.max(delta, 0), 0.06);
     // Time runs slowly in the showroom too, so traffic is visible behind the menus.
-    (this as { elapsed: number }).elapsed += dt;
+    this.elapsed += dt;
     this.updateTrafficLights();
 
     this.cars.forEach((car) => {
