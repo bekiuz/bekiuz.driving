@@ -117,10 +117,10 @@ export class TrafficSystem {
 
     // Counter-clockwise lane: offset to the opposite side of each road.
     const counterClockwise: Array<[number, number]> = [
-      [-192.4, -157.6],
-      [-192.4, 162.4],
-      [87.6, 162.4],
-      [87.6, -157.6],
+      [-197.6, -157.6],
+      [-197.6, 162.4],
+      [92.4, 162.4],
+      [92.4, -157.6],
     ];
 
     const definitions = [
@@ -137,9 +137,9 @@ export class TrafficSystem {
         points: counterClockwise,
         signals: [
           { id: 3, distance: 157.6, axis: 'vertical' as const },
-          { id: 2, distance: 192.4, axis: 'horizontal' as const },
+          { id: 2, distance: 197.6, axis: 'horizontal' as const },
           { id: 1, distance: 162.4, axis: 'vertical' as const },
-          { id: 0, distance: 87.6, axis: 'horizontal' as const },
+          { id: 0, distance: 92.4, axis: 'horizontal' as const },
         ],
       },
     ];
