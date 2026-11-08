@@ -293,12 +293,14 @@ export function createProceduralCity(): CityEnvironment {
   const rampLength = 35;
   const rampSouth = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 4, 1, rampLength), bridgeSteelMat);
   rampSouth.position.set(bridgeX, 2.8, 160 - rampLength / 2);
-  rampSouth.rotation.x = -0.14;
+  // South approach rises as Z decreases toward the bridge deck.
+  rampSouth.rotation.x = 0.14;
   sceneGroup.add(rampSouth);
 
   const rampNorth = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 4, 1, rampLength), bridgeSteelMat);
   rampNorth.position.set(bridgeX, 2.8, -155 + rampLength / 2);
-  rampNorth.rotation.x = 0.14;
+  // North approach rises as Z increases toward the bridge deck.
+  rampNorth.rotation.x = -0.14;
   sceneGroup.add(rampNorth);
 
   // Bridge Towers (2 massive A-frame suspension towers)
