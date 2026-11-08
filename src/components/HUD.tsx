@@ -47,6 +47,12 @@ export const HUD: React.FC<HUDProps> = ({
   };
 
   const isRacing = screen === 'racing' && raceState !== null;
+  const policeDistance = 18;
+  const policePosition: [number, number, number] = [
+    telemetry.position[0] - Math.sin(telemetry.rotationY) * policeDistance,
+    telemetry.position[1],
+    telemetry.position[2] - Math.cos(telemetry.rotationY) * policeDistance,
+  ];
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none z-20 flex flex-col justify-between p-3 sm:p-5">
@@ -59,6 +65,7 @@ export const HUD: React.FC<HUDProps> = ({
           <Minimap
             carPosition={telemetry.position}
             carRotationY={telemetry.rotationY}
+            policePosition={policePosition}
             checkpoints={checkpoints}
             activeCheckpointIndex={raceState?.currentCheckpointIndex}
           />
