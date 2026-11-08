@@ -63,62 +63,62 @@ export const Minimap: React.FC<MinimapProps> = ({
       return [mx, my];
     };
 
-    // Draw Roads
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-    ctx.lineWidth = 5;
+    // Draw the same building footprints and road center-lines used by the 3D city.
+    const drawRoad = (
+      fromX: number,
+      fromZ: number,
+      toX: number,
+      toZ: number,
+      color = 'rgba(148, 163, 184, 0.52)',
+      widthMeters = 20
+    ) => {
+      const [sx, sy] = worldToMap(fromX, fromZ);
+      const [ex, ey] = worldToMap(toX, toZ);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(2, widthMeters * scale);
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    };
 
-    // Central N-S
-    let [x1, y1] = worldToMap(0, -180);
-    let [x2, y2] = worldToMap(0, 180);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    const drawBuilding = (cx: number, cz: number, width: number, depth: number) => {
+      const [x, y] = worldToMap(cx, cz);
+      ctx.fillStyle = 'rgba(71, 85, 105, 0.72)';
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.fillRect(x - (width * scale) / 2, y - (depth * scale) / 2, width * scale, depth * scale);
+      ctx.strokeRect(x - (width * scale) / 2, y - (depth * scale) / 2, width * scale, depth * scale);
+    };
 
-    // Central E-W
-    [x1, y1] = worldToMap(-200, 0);
-    [x2, y2] = worldToMap(160, 0);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    // Buildings, plotted from the exact centers and sizes in proceduralCity.ts.
+    [
+      [-140, -80, 55, 85],
+      [-140, 60, 55, 75],
+      [-45, -80, 45, 75],
+      [-45, 80, 45, 70],
+      [45, -80, 45, 75],
+      [45, 80, 45, 70],
+      [135, -80, 50, 75],
+      [135, 80, 50, 70],
+    ].forEach(([x, z, width, depth]) => drawBuilding(x, z, width, depth));
 
-    // North & South Perimeter
-    [x1, y1] = worldToMap(-200, -155);
-    [x2, y2] = worldToMap(180, -155);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    // Main grid and perimeter streets.
+    drawRoad(0, -180, 0, 180);
+    drawRoad(-200, 0, 160, 0);
+    drawRoad(-200, -160, 180, -160);
+    drawRoad(-200, 160, 180, 160);
 
-    [x1, y1] = worldToMap(-200, 160);
-    [x2, y2] = worldToMap(180, 160);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    // Three north-south avenues through the city.
+    drawRoad(-195, -160, -195, 160);
+    drawRoad(-90, -160, -90, 160);
+    drawRoad(90, -160, 90, 160);
 
-    // Bridge deck and its two short approach connectors.
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.65)';
-    [x1, y1] = worldToMap(195, -155);
-    [x2, y2] = worldToMap(195, 160);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
-    ctx.lineWidth = 4;
-    [[180, 160, 195, 160], [180, -155, 195, -155]].forEach(
-      ([sx, sz, ex, ez]) => {
-        const [startX, startY] = worldToMap(sx, sz);
-        const [endX, endY] = worldToMap(ex, ez);
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-      }
-    );
+    // Elevated bridge and short links into each perimeter road.
+    drawRoad(195, -150, 195, 150, 'rgba(6, 182, 212, 0.82)');
+    drawRoad(180, 160, 183, 160, 'rgba(6, 182, 212, 0.7)', 20);
+    drawRoad(180, -160, 183, -160, 'rgba(6, 182, 212, 0.7)', 20);
 
     // Draw Race Checkpoints
     if (checkpoints && checkpoints.length > 0) {
