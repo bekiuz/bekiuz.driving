@@ -22,6 +22,68 @@ export interface CarVisualRig {
   dispose: () => void;
 }
 
+type BodyLoftStation = readonly [z: number, width: number, centerOffset: number, halfHeight: number];
+
+function createBodyLoftGeometry(
+  length: number,
+  width: number,
+  height: number,
+  wheelRadius: number,
+  stations: readonly BodyLoftStation[],
+  radialSegments = 28
+): THREE.BufferGeometry {
+  const vertices: number[] = [];
+  const indices: number[] = [];
+
+  stations.forEach(([zFactor, widthFactor, centerOffset, halfHeightFactor]) => {
+    for (let segment = 0; segment < radialSegments; segment++) {
+      const angle = (segment / radialSegments) * Math.PI * 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const xShape = Math.sign(cos) * Math.pow(Math.abs(cos), 0.78);
+      const yShape = Math.sign(sin) * Math.pow(Math.abs(sin), 0.78);
+      vertices.push(
+        xShape * width * 0.5 * widthFactor,
+        wheelRadius + height * centerOffset + yShape * height * halfHeightFactor,
+        length * zFactor
+      );
+    }
+  });
+
+  for (let ring = 0; ring < stations.length - 1; ring++) {
+    const currentStart = ring * radialSegments;
+    const nextStart = (ring + 1) * radialSegments;
+    for (let segment = 0; segment < radialSegments; segment++) {
+      const nextSegment = (segment + 1) % radialSegments;
+      const a = currentStart + segment;
+      const b = currentStart + nextSegment;
+      const c = nextStart + nextSegment;
+      const d = nextStart + segment;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+
+  const rearCenter = vertices.length / 3;
+  vertices.push(0, wheelRadius + height * stations[0][2], length * stations[0][0]);
+  const frontCenter = vertices.length / 3;
+  const last = stations[stations.length - 1];
+  vertices.push(0, wheelRadius + height * last[2], length * last[0]);
+
+  for (let segment = 0; segment < radialSegments; segment++) {
+    const nextSegment = (segment + 1) % radialSegments;
+    indices.push(rearCenter, nextSegment, segment);
+    const lastStart = (stations.length - 1) * radialSegments;
+    indices.push(frontCenter, lastStart + segment, lastStart + nextSegment);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 export function createProceduralCar(config: CarConfig, customization: CarCustomization): CarVisualRig {
   const carGroup = new THREE.Group();
   const chassisMesh = new THREE.Group();
@@ -154,7 +216,48 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
     config.style === 'bugatti_chiron' ||
     config.style === 'ferrari_488'
   ) {
-    // Four distinct performance-car silhouettes built from lightweight Three.js geometry.
+    const isBmw = config.style === 'bmw_m4';
+    const isMercedes = config.style === 'mercedes_amg';
+    const isBugatti = config.style === 'bugatti_chiron';
+    const isFerrari = config.style === 'ferrari_488';
+
+    // Each car gets its own smooth longitudinal body profile: low nose,
+    // raised wheel shoulders and a tapered tail, instead of a large box.
+    const profiles: Record<string, BodyLoftStation[]> = {
+      bmw_m4: [
+        [-0.50, 0.58, 0.035, 0.105], [-0.43, 0.84, 0.055, 0.16],
+        [-0.29, 0.98, 0.065, 0.18], [-0.05, 1.00, 0.065, 0.18],
+        [0.22, 0.98, 0.055, 0.17], [0.42, 0.84, 0.025, 0.135],
+        [0.50, 0.61, 0.005, 0.075],
+      ],
+      mercedes_amg: [
+        [-0.50, 0.56, 0.025, 0.095], [-0.42, 0.82, 0.05, 0.15],
+        [-0.24, 0.97, 0.065, 0.18], [0.02, 1.00, 0.065, 0.18],
+        [0.30, 0.94, 0.045, 0.15], [0.43, 0.79, 0.015, 0.12],
+        [0.50, 0.55, -0.005, 0.07],
+      ],
+      bugatti_chiron: [
+        [-0.50, 0.61, 0.025, 0.10], [-0.43, 0.88, 0.05, 0.16],
+        [-0.25, 0.99, 0.065, 0.18], [0.02, 1.00, 0.06, 0.18],
+        [0.27, 0.97, 0.04, 0.16], [0.43, 0.83, 0.005, 0.12],
+        [0.50, 0.63, -0.015, 0.065],
+      ],
+      ferrari_488: [
+        [-0.50, 0.54, 0.025, 0.09], [-0.42, 0.83, 0.05, 0.15],
+        [-0.23, 0.98, 0.06, 0.18], [0.04, 1.00, 0.05, 0.175],
+        [0.30, 0.91, 0.015, 0.14], [0.43, 0.76, -0.015, 0.105],
+        [0.50, 0.52, -0.035, 0.06],
+      ],
+    };
+
+    mainBodyMesh = new THREE.Mesh(
+      createBodyLoftGeometry(length, width, height, wheelRadius, profiles[config.style]),
+      paintMaterial
+    );
+    mainBodyMesh.castShadow = true;
+    mainBodyMesh.receiveShadow = true;
+    chassisMesh.add(mainBodyMesh);
+
     const addBox = (
       boxWidth: number,
       boxHeight: number,
@@ -166,10 +269,7 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
       rotationX = 0,
       rotationZ = 0
     ) => {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(boxWidth, boxHeight, boxLength),
-        material
-      );
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(boxWidth, boxHeight, boxLength), material);
       mesh.position.set(x, y, z);
       mesh.rotation.set(rotationX, 0, rotationZ);
       mesh.castShadow = true;
@@ -178,115 +278,177 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
       return mesh;
     };
 
-    const isBmw = config.style === 'bmw_m4';
-    const isMercedes = config.style === 'mercedes_amg';
-    const isBugatti = config.style === 'bugatti_chiron';
-    const isFerrari = config.style === 'ferrari_488';
+    const detailMaterial = new THREE.MeshStandardMaterial({
+      color: 0x141820,
+      metalness: 0.55,
+      roughness: 0.35,
+    });
 
-    const mainBodyGeo = new THREE.BoxGeometry(
-      width * 0.95,
-      height * (isBugatti || isFerrari ? 0.39 : 0.44),
-      length
+    // A shaped glasshouse gives the coupe/hypercar a lower roof and sloping windows.
+    const canopyProfiles: BodyLoftStation[] = [
+      [-0.295, 0.49, 0.31, 0.095],
+      [-0.235, 0.70, 0.34, 0.145],
+      [-0.08, 0.77, 0.345, 0.155],
+      [0.105, 0.74, 0.325, 0.145],
+      [0.245, 0.51, 0.275, 0.09],
+    ];
+    const canopy = new THREE.Mesh(
+      createBodyLoftGeometry(length, width * 0.92, height, wheelRadius, canopyProfiles, 24),
+      glassMaterial
     );
-    mainBodyMesh = new THREE.Mesh(mainBodyGeo, paintMaterial);
-    mainBodyMesh.position.y = height * 0.31;
-    mainBodyMesh.castShadow = true;
-    mainBodyMesh.receiveShadow = true;
-    chassisMesh.add(mainBodyMesh);
+    canopy.castShadow = true;
+    chassisMesh.add(canopy);
 
-    // Long bonnet and rear deck are angled to avoid the old box-shaped starter-car look.
-    addBox(width * 0.91, height * 0.12, length * (isMercedes ? 0.38 : 0.34),
-      paintMaterial, 0, height * 0.49, length * 0.29, isBugatti ? 0.03 : 0.10);
-    addBox(width * 0.88, height * 0.10, length * 0.20,
-      paintMaterial, 0, height * 0.47, -length * 0.39, -0.06);
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(width * (isBugatti ? 0.62 : 0.66), 0.045, length * (isMercedes ? 0.34 : 0.36)),
+      isBugatti ? secondaryMaterial : paintMaterial
+    );
+    roof.position.set(0, wheelRadius + height * 0.49, -length * 0.025);
+    roof.castShadow = true;
+    chassisMesh.add(roof);
 
-    const cabinWidth = width * (isBugatti ? 0.69 : isFerrari ? 0.72 : 0.75);
-    const cabinLength = length * (isMercedes ? 0.43 : isBugatti ? 0.39 : 0.45);
-    addBox(cabinWidth, height * 0.39, cabinLength,
-      glassMaterial, 0, height * 0.67, -length * (isMercedes ? 0.10 : 0.07), -0.04);
-    addBox(cabinWidth * 0.97, height * 0.055, cabinLength * 0.90,
-      paintMaterial, 0, height * 0.88, -length * 0.07);
-
-    // Side skirts, mirrors and sculpted door lines.
+    // Side sills, mirrors, black window pillars and functional-looking air vents.
     for (const side of [-1, 1]) {
-      addBox(width * 0.055, height * 0.09, length * 0.62,
-        carbonMaterial, side * width * 0.47, height * 0.20, -length * 0.01);
-      addBox(width * 0.095, height * 0.075, length * 0.12,
-        secondaryMaterial, side * width * 0.48, height * 0.61, length * 0.13);
-      addBox(width * 0.012, height * 0.018, length * 0.32,
-        secondaryMaterial, side * width * 0.475, height * 0.34, -length * 0.02);
+      addBox(width * 0.055, height * 0.075, length * 0.61,
+        carbonMaterial, side * width * 0.465, wheelRadius + height * 0.015, -length * 0.005);
+      addBox(width * 0.075, height * 0.055, length * 0.115,
+        secondaryMaterial, side * width * 0.455, wheelRadius + height * 0.355, length * 0.14,
+        0, side * -0.16);
+      addBox(0.035, height * 0.24, 0.055, detailMaterial,
+        side * width * 0.335, wheelRadius + height * 0.36, -length * 0.07);
+      addBox(width * 0.095, height * 0.12, 0.025, carbonMaterial,
+        side * width * 0.455, wheelRadius + height * 0.17, length * 0.255,
+        0, side * -0.12);
+      for (let vent = 0; vent < 2; vent++) {
+        addBox(width * 0.065, 0.018, 0.032, secondaryMaterial,
+          side * width * 0.455, wheelRadius + height * (0.145 + vent * 0.035), length * 0.255);
+      }
+    }
+
+    // Low splitter, rear diffuser and five aerodynamic diffuser fins.
+    addBox(width * 0.98, 0.045, 0.30, carbonMaterial, 0, wheelRadius * 0.42, length * 0.48);
+    addBox(width * 0.82, 0.065, 0.26, carbonMaterial, 0, wheelRadius * 0.40, -length * 0.48);
+    for (let fin = -2; fin <= 2; fin++) {
+      addBox(0.035, 0.10, 0.22, detailMaterial,
+        fin * width * 0.13, wheelRadius * 0.38, -length * 0.46);
     }
 
     if (isBmw) {
-      // Twin kidney grille and a compact M-style rear lip.
+      // Twin kidney grille and split lower intake.
       for (const side of [-1, 1]) {
-        addBox(width * 0.145, height * 0.25, 0.045,
-          secondaryMaterial, side * width * 0.105, height * 0.31, length * 0.514);
-        addBox(width * 0.105, height * 0.20, 0.052,
-          carbonMaterial, side * width * 0.105, height * 0.31, length * 0.52);
-        addBox(width * 0.025, height * 0.035, length * 0.25,
-          secondaryMaterial, side * width * 0.27, height * 0.53, length * 0.24);
+        const kidney = new THREE.Mesh(
+          new THREE.TorusGeometry(width * 0.075, 0.022, 8, 24),
+          secondaryMaterial
+        );
+        kidney.scale.y = 1.35;
+        kidney.position.set(side * width * 0.095, wheelRadius + height * 0.085, length * 0.505);
+        chassisMesh.add(kidney);
+        addBox(width * 0.10, height * 0.105, 0.035, detailMaterial,
+          side * width * 0.095, wheelRadius + height * 0.085, length * 0.505);
+        addBox(width * 0.25, height * 0.08, 0.04, carbonMaterial,
+          side * width * 0.30, wheelRadius + height * 0.07, length * 0.50);
       }
-      addBox(width * 0.82, height * 0.045, 0.18,
-        carbonMaterial, 0, height * 0.63, -length * 0.47);
+      addBox(width * 0.88, 0.06, 0.16, carbonMaterial,
+        0, wheelRadius + height * 0.27, -length * 0.465);
+      addBox(width * 0.025, height * 0.12, 0.025, secondaryMaterial,
+        width * 0.46, wheelRadius + height * 0.22, length * 0.19);
     } else if (isMercedes) {
-      // Wide Panamericana-inspired grille and a three-point star silhouette.
-      addBox(width * 0.42, height * 0.25, 0.055,
-        carbonMaterial, 0, height * 0.30, length * 0.515);
-      for (let bar = -2; bar <= 2; bar++) {
-        addBox(width * 0.012, height * 0.22, 0.018,
-          secondaryMaterial, bar * width * 0.065, height * 0.30, length * 0.535);
+      // Wide vertical-slat grille and central three-point-star-inspired detail.
+      addBox(width * 0.43, height * 0.22, 0.045, detailMaterial,
+        0, wheelRadius + height * 0.055, length * 0.505);
+      for (let bar = -3; bar <= 3; bar++) {
+        addBox(0.018, height * 0.19, 0.022, secondaryMaterial,
+          bar * width * 0.055, wheelRadius + height * 0.055, length * 0.53);
       }
-      const starRing = new THREE.Mesh(
-        new THREE.TorusGeometry(width * 0.09, 0.018, 8, 24),
+      const emblemRing = new THREE.Mesh(
+        new THREE.TorusGeometry(width * 0.075, 0.014, 8, 24),
         secondaryMaterial
       );
-      starRing.position.set(0, height * 0.30, length * 0.55);
-      starRing.castShadow = true;
-      chassisMesh.add(starRing);
+      emblemRing.position.set(0, wheelRadius + height * 0.06, length * 0.548);
+      chassisMesh.add(emblemRing);
       for (let spoke = 0; spoke < 3; spoke++) {
-        addBox(0.022, height * 0.15, 0.022,
-          secondaryMaterial, 0, height * 0.30, length * 0.555,
-          0, (spoke * Math.PI) / 3);
+        addBox(0.018, height * 0.105, 0.018, secondaryMaterial,
+          0, wheelRadius + height * 0.06, length * 0.552, 0, spoke * Math.PI / 3);
       }
-      addBox(width * 0.84, height * 0.045, 0.18,
-        carbonMaterial, 0, height * 0.18, length * 0.50);
+      addBox(width * 0.86, 0.055, 0.14, carbonMaterial,
+        0, wheelRadius + height * 0.28, -length * 0.46);
     } else if (isBugatti) {
-      // Horseshoe grille and the characteristic central spine.
-      addBox(width * 0.38, height * 0.29, 0.05,
-        carbonMaterial, 0, height * 0.27, length * 0.51);
+      // Horseshoe grille, central coachline and broad rear spoiler.
       const horseshoe = new THREE.Mesh(
-        new THREE.TorusGeometry(width * 0.125, 0.045, 10, 28),
+        new THREE.TorusGeometry(width * 0.115, 0.038, 10, 30),
         secondaryMaterial
       );
-      horseshoe.position.set(0, height * 0.28, length * 0.55);
-      horseshoe.scale.set(0.88, 1.2, 1);
-      horseshoe.castShadow = true;
+      horseshoe.scale.set(0.92, 1.25, 1);
+      horseshoe.position.set(0, wheelRadius + height * 0.065, length * 0.51);
       chassisMesh.add(horseshoe);
-      addBox(width * 0.022, height * 0.055, length * 0.36,
-        secondaryMaterial, 0, height * 0.53, length * 0.25);
-      addBox(width * 0.98, height * 0.04, 0.28,
-        carbonMaterial, 0, height * 0.15, length * 0.50);
-      addBox(width * 0.96, height * 0.06, 0.20,
-        carbonMaterial, 0, height * 0.17, -length * 0.49);
-    } else if (isFerrari) {
-      // Wide lower intake, bonnet creases and a track-inspired rear diffuser.
-      addBox(width * 0.58, height * 0.16, 0.055,
-        carbonMaterial, 0, height * 0.23, length * 0.515);
-      for (let line = -1; line <= 1; line++) {
-        addBox(width * 0.48, 0.018, 0.018,
-          secondaryMaterial, 0, height * (0.19 + (line + 1) * 0.045), length * 0.545);
-      }
+      addBox(width * 0.17, height * 0.18, 0.035, detailMaterial,
+        0, wheelRadius + height * 0.055, length * 0.512);
+      addBox(width * 0.022, 0.035, length * 0.75, secondaryMaterial,
+        0, wheelRadius + height * 0.245, 0);
+      addBox(width * 0.95, 0.055, 0.22, carbonMaterial,
+        0, wheelRadius + height * 0.25, -length * 0.465);
       for (const side of [-1, 1]) {
-        addBox(width * 0.035, height * 0.04, length * 0.28,
-          secondaryMaterial, side * width * 0.24, height * 0.54, length * 0.25, 0.08);
-        addBox(width * 0.12, height * 0.16, length * 0.22,
-          carbonMaterial, side * width * 0.44, height * 0.36, -length * 0.06, 0, side * -0.10);
+        addBox(width * 0.018, height * 0.18, length * 0.24, secondaryMaterial,
+          side * width * 0.455, wheelRadius + height * 0.19, -length * 0.12, 0, side * 0.20);
       }
-      addBox(width * 0.98, height * 0.035, 0.34,
-        carbonMaterial, 0, height * 0.14, length * 0.50);
-      addBox(width * 0.86, height * 0.055, 0.20,
-        carbonMaterial, 0, height * 0.57, -length * 0.45);
+    } else if (isFerrari) {
+      // Wide lower intake, bonnet creases and sculpted rear-quarter side intakes.
+      addBox(width * 0.57, height * 0.125, 0.04, detailMaterial,
+        0, wheelRadius + height * 0.015, length * 0.505);
+      for (const side of [-1, 1]) {
+        addBox(width * 0.035, height * 0.13, length * 0.28, secondaryMaterial,
+          side * width * 0.22, wheelRadius + height * 0.21, length * 0.24, 0, side * -0.12);
+        addBox(width * 0.14, height * 0.13, length * 0.23, carbonMaterial,
+          side * width * 0.425, wheelRadius + height * 0.14, -length * 0.10, 0, side * -0.12);
+      }
+      for (const crease of [-1, 1]) {
+        addBox(width * 0.025, 0.025, length * 0.31, secondaryMaterial,
+          crease * width * 0.24, wheelRadius + height * 0.14, length * 0.26, 0, crease * -0.04);
+      }
+      addBox(width * 0.86, 0.06, 0.15, carbonMaterial,
+        0, wheelRadius + height * 0.25, -length * 0.46);
+    }
+
+    // Painted wheel-arch lips visually connect the wide body to the tyres.
+    const wheelbase = length * 0.32;
+    for (const side of [-1, 1]) {
+      for (const axleZ of [-wheelbase, wheelbase]) {
+        const points: THREE.Vector3[] = [];
+        for (let step = 0; step <= 16; step++) {
+          const angle = Math.PI * (step / 16);
+          points.push(new THREE.Vector3(
+            side * width * 0.475,
+            wheelRadius + Math.sin(angle) * wheelRadius * 1.08,
+            axleZ + Math.cos(angle) * wheelRadius * 1.08
+          ));
+        }
+        const archCurve = new THREE.CatmullRomCurve3(points);
+        const arch = new THREE.Mesh(
+          new THREE.TubeGeometry(archCurve, 24, 0.022, 6, false),
+          isBugatti ? secondaryMaterial : paintMaterial
+        );
+        arch.castShadow = true;
+        chassisMesh.add(arch);
+      }
+    }
+
+    // Model-specific LED shapes and rear lamps.
+    for (const side of [-1, 1]) {
+      const lamp = new THREE.Mesh(
+        new THREE.BoxGeometry(width * (isFerrari ? 0.22 : isBugatti ? 0.17 : 0.19), 0.045, 0.035),
+        headlightMat
+      );
+      lamp.position.set(side * width * 0.325, wheelRadius + height * 0.09, length * 0.485);
+      lamp.rotation.z = side * (isBmw ? 0.20 : isMercedes ? 0.08 : isBugatti ? 0.12 : -0.24);
+      chassisMesh.add(lamp);
+
+      const rearLamp = new THREE.Mesh(
+        new THREE.BoxGeometry(width * (isBugatti ? 0.28 : 0.22), 0.045, 0.035),
+        taillightMat
+      );
+      rearLamp.position.set(side * width * 0.29, wheelRadius + height * 0.12, -length * 0.485);
+      rearLamp.rotation.z = side * (isFerrari ? 0.12 : 0.03);
+      chassisMesh.add(rearLamp);
     }
   } else if (config.style === 'veloce') {
     // Sports GT: Wide sculpted stance, mid-engine profile, aggressive lines
