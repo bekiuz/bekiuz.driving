@@ -14,6 +14,7 @@ interface GarageProps {
   profile: PlayerProfile;
   activeCarConfig: CarConfig;
   onSelectCar: (carId: string) => void;
+  onPreviewCar: (carId: string) => void;
   onBuyCar: (car: CarConfig) => boolean;
   onUpgradeCar: (carId: string, upgradeType: keyof CarUpgrades, cost: number) => boolean;
   onUpdateCustomization: (carId: string, customization: CarCustomization) => void;
@@ -25,6 +26,7 @@ export const Garage: React.FC<GarageProps> = ({
   profile,
   activeCarConfig,
   onSelectCar,
+  onPreviewCar,
   onBuyCar,
   onUpgradeCar,
   onUpdateCustomization,
@@ -61,14 +63,14 @@ export const Garage: React.FC<GarageProps> = ({
     soundManager.playUiClick();
     const nextIdx = (previewCarIndex - 1 + CARS.length) % CARS.length;
     setPreviewCarIndex(nextIdx);
-    onSelectCar(CARS[nextIdx].id);
+    onPreviewCar(CARS[nextIdx].id);
   };
 
   const handleNextCar = () => {
     soundManager.playUiClick();
     const nextIdx = (previewCarIndex + 1) % CARS.length;
     setPreviewCarIndex(nextIdx);
-    onSelectCar(CARS[nextIdx].id);
+    onPreviewCar(CARS[nextIdx].id);
   };
 
   const handleBuy = () => {

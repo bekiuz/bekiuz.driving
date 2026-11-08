@@ -44,7 +44,7 @@ export interface CarConfig {
     wheelRadius: number;
     wheelWidth: number;
   };
-  style: 'apex' | 'veloce' | 'hyperion';
+  style: 'apex' | 'veloce' | 'hyperion' | 'bmw_m4' | 'mercedes_amg' | 'bugatti_chiron' | 'ferrari_488';
 }
 
 export interface TrackCheckpoint {

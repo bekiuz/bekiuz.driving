@@ -320,6 +320,10 @@ export default function App() {
   };
 
   const handleBackToMenu = () => {
+    if (currentScreen === 'garage') {
+      // Restore the actually selected vehicle after previewing locked cars.
+      engineRef.current?.switchCar(activeCar, activeUpgrades, activeCustomization);
+    }
     setCurrentScreen('menu');
     setIsPaused(false);
     setShowRaceResults(false);
@@ -355,6 +359,26 @@ export default function App() {
     };
 
     engineRef.current?.switchCar(selected, upgrades, customization);
+  };
+
+  const handlePreviewCar = (carId: string) => {
+    const car = CARS.find((c) => c.id === carId);
+    if (!car) return;
+    const upgrades = profile.carUpgrades[carId] || {
+      engine: 1,
+      transmission: 1,
+      suspension: 1,
+      brakes: 1,
+      nitro: 1,
+    };
+    const customization = profile.carCustomizations[carId] || {
+      bodyColor: '#e11d48',
+      secondaryColor: '#18181b',
+      rimColor: '#d4d4d8',
+      neonColor: 'none',
+      finish: 'gloss' as const,
+    };
+    engineRef.current?.switchCar(car, upgrades, customization);
   };
 
   const handleBuyCar = (car: CarConfig): boolean => {
@@ -482,6 +506,7 @@ export default function App() {
           profile={profile}
           activeCarConfig={activeCar}
           onSelectCar={handleSelectCar}
+          onPreviewCar={handlePreviewCar}
           onBuyCar={handleBuyCar}
           onUpgradeCar={handleUpgradeCar}
           onUpdateCustomization={handleUpdateCustomization}

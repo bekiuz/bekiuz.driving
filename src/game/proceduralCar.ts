@@ -148,6 +148,146 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
     splitter.position.set(0, height * 0.14, length * 0.48);
     chassisMesh.add(splitter);
 
+  } else if (
+    config.style === 'bmw_m4' ||
+    config.style === 'mercedes_amg' ||
+    config.style === 'bugatti_chiron' ||
+    config.style === 'ferrari_488'
+  ) {
+    // Four distinct performance-car silhouettes built from lightweight Three.js geometry.
+    const addBox = (
+      boxWidth: number,
+      boxHeight: number,
+      boxLength: number,
+      material: THREE.Material,
+      x: number,
+      y: number,
+      z: number,
+      rotationX = 0,
+      rotationZ = 0
+    ) => {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(boxWidth, boxHeight, boxLength),
+        material
+      );
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(rotationX, 0, rotationZ);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      chassisMesh.add(mesh);
+      return mesh;
+    };
+
+    const isBmw = config.style === 'bmw_m4';
+    const isMercedes = config.style === 'mercedes_amg';
+    const isBugatti = config.style === 'bugatti_chiron';
+    const isFerrari = config.style === 'ferrari_488';
+
+    const mainBodyGeo = new THREE.BoxGeometry(
+      width * 0.95,
+      height * (isBugatti || isFerrari ? 0.39 : 0.44),
+      length
+    );
+    mainBodyMesh = new THREE.Mesh(mainBodyGeo, paintMaterial);
+    mainBodyMesh.position.y = height * 0.31;
+    mainBodyMesh.castShadow = true;
+    mainBodyMesh.receiveShadow = true;
+    chassisMesh.add(mainBodyMesh);
+
+    // Long bonnet and rear deck are angled to avoid the old box-shaped starter-car look.
+    addBox(width * 0.91, height * 0.12, length * (isMercedes ? 0.38 : 0.34),
+      paintMaterial, 0, height * 0.49, length * 0.29, isBugatti ? 0.03 : 0.10);
+    addBox(width * 0.88, height * 0.10, length * 0.20,
+      paintMaterial, 0, height * 0.47, -length * 0.39, -0.06);
+
+    const cabinWidth = width * (isBugatti ? 0.69 : isFerrari ? 0.72 : 0.75);
+    const cabinLength = length * (isMercedes ? 0.43 : isBugatti ? 0.39 : 0.45);
+    addBox(cabinWidth, height * 0.39, cabinLength,
+      glassMaterial, 0, height * 0.67, -length * (isMercedes ? 0.10 : 0.07), -0.04);
+    addBox(cabinWidth * 0.97, height * 0.055, cabinLength * 0.90,
+      paintMaterial, 0, height * 0.88, -length * 0.07);
+
+    // Side skirts, mirrors and sculpted door lines.
+    for (const side of [-1, 1]) {
+      addBox(width * 0.055, height * 0.09, length * 0.62,
+        carbonMaterial, side * width * 0.47, height * 0.20, -length * 0.01);
+      addBox(width * 0.095, height * 0.075, length * 0.12,
+        secondaryMaterial, side * width * 0.48, height * 0.61, length * 0.13);
+      addBox(width * 0.012, height * 0.018, length * 0.32,
+        secondaryMaterial, side * width * 0.475, height * 0.34, -length * 0.02);
+    }
+
+    if (isBmw) {
+      // Twin kidney grille and a compact M-style rear lip.
+      for (const side of [-1, 1]) {
+        addBox(width * 0.145, height * 0.25, 0.045,
+          secondaryMaterial, side * width * 0.105, height * 0.31, length * 0.514);
+        addBox(width * 0.105, height * 0.20, 0.052,
+          carbonMaterial, side * width * 0.105, height * 0.31, length * 0.52);
+        addBox(width * 0.025, height * 0.035, length * 0.25,
+          secondaryMaterial, side * width * 0.27, height * 0.53, length * 0.24);
+      }
+      addBox(width * 0.82, height * 0.045, 0.18,
+        carbonMaterial, 0, height * 0.63, -length * 0.47);
+    } else if (isMercedes) {
+      // Wide Panamericana-inspired grille and a three-point star silhouette.
+      addBox(width * 0.42, height * 0.25, 0.055,
+        carbonMaterial, 0, height * 0.30, length * 0.515);
+      for (let bar = -2; bar <= 2; bar++) {
+        addBox(width * 0.012, height * 0.22, 0.018,
+          secondaryMaterial, bar * width * 0.065, height * 0.30, length * 0.535);
+      }
+      const starRing = new THREE.Mesh(
+        new THREE.TorusGeometry(width * 0.09, 0.018, 8, 24),
+        secondaryMaterial
+      );
+      starRing.position.set(0, height * 0.30, length * 0.55);
+      starRing.castShadow = true;
+      chassisMesh.add(starRing);
+      for (let spoke = 0; spoke < 3; spoke++) {
+        addBox(0.022, height * 0.15, 0.022,
+          secondaryMaterial, 0, height * 0.30, length * 0.555,
+          0, (spoke * Math.PI) / 3);
+      }
+      addBox(width * 0.84, height * 0.045, 0.18,
+        carbonMaterial, 0, height * 0.18, length * 0.50);
+    } else if (isBugatti) {
+      // Horseshoe grille and the characteristic central spine.
+      addBox(width * 0.38, height * 0.29, 0.05,
+        carbonMaterial, 0, height * 0.27, length * 0.51);
+      const horseshoe = new THREE.Mesh(
+        new THREE.TorusGeometry(width * 0.125, 0.045, 10, 28),
+        secondaryMaterial
+      );
+      horseshoe.position.set(0, height * 0.28, length * 0.55);
+      horseshoe.scale.set(0.88, 1.2, 1);
+      horseshoe.castShadow = true;
+      chassisMesh.add(horseshoe);
+      addBox(width * 0.022, height * 0.055, length * 0.36,
+        secondaryMaterial, 0, height * 0.53, length * 0.25);
+      addBox(width * 0.98, height * 0.04, 0.28,
+        carbonMaterial, 0, height * 0.15, length * 0.50);
+      addBox(width * 0.96, height * 0.06, 0.20,
+        carbonMaterial, 0, height * 0.17, -length * 0.49);
+    } else if (isFerrari) {
+      // Wide lower intake, bonnet creases and a track-inspired rear diffuser.
+      addBox(width * 0.58, height * 0.16, 0.055,
+        carbonMaterial, 0, height * 0.23, length * 0.515);
+      for (let line = -1; line <= 1; line++) {
+        addBox(width * 0.48, 0.018, 0.018,
+          secondaryMaterial, 0, height * (0.19 + (line + 1) * 0.045), length * 0.545);
+      }
+      for (const side of [-1, 1]) {
+        addBox(width * 0.035, height * 0.04, length * 0.28,
+          secondaryMaterial, side * width * 0.24, height * 0.54, length * 0.25, 0.08);
+        addBox(width * 0.12, height * 0.16, length * 0.22,
+          carbonMaterial, side * width * 0.44, height * 0.36, -length * 0.06, 0, side * -0.10);
+      }
+      addBox(width * 0.98, height * 0.035, 0.34,
+        carbonMaterial, 0, height * 0.14, length * 0.50);
+      addBox(width * 0.86, height * 0.055, 0.20,
+        carbonMaterial, 0, height * 0.57, -length * 0.45);
+    }
   } else if (config.style === 'veloce') {
     // Sports GT: Wide sculpted stance, mid-engine profile, aggressive lines
     const mainBodyGeo = new THREE.BoxGeometry(width * 0.94, height * 0.45, length);
@@ -230,7 +370,12 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
   // 2. LIGHTS (Headlights & Taillights)
   // ==========================================
   // Headlights
-  const headlightGeo = new THREE.BoxGeometry(width * 0.22, 0.1, 0.05);
+  const headlightWidth =
+    config.style === 'bmw_m4' ? 0.20 :
+    config.style === 'mercedes_amg' ? 0.22 :
+    config.style === 'bugatti_chiron' ? 0.16 :
+    config.style === 'ferrari_488' ? 0.24 : 0.22;
+  const headlightGeo = new THREE.BoxGeometry(width * headlightWidth, 0.09, 0.05);
   const headL = new THREE.Mesh(headlightGeo, headlightMat);
   headL.position.set(-width * 0.33, height * 0.38, length * 0.495);
   const headR = headL.clone();
@@ -452,16 +597,17 @@ export function createProceduralCar(config: CarConfig, customization: CarCustomi
   };
 
   const dispose = () => {
-    // Dispose geometries and materials
-    [mainBodyMesh, ...rimMeshes].forEach((m) => {
-      m.geometry.dispose();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    carGroup.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      geometries.add(mesh.geometry);
+      const meshMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      meshMaterials.forEach((material) => materials.add(material));
     });
-    paintMaterial.dispose();
-    secondaryMaterial.dispose();
-    carbonMaterial.dispose();
-    glassMaterial.dispose();
-    rimMaterial.dispose();
-    tireMaterial.dispose();
+    geometries.forEach((geometry) => geometry.dispose());
+    materials.forEach((material) => material.dispose());
     shadowTexture.dispose();
   };
 
