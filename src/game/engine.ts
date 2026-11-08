@@ -8,6 +8,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { CarConfig, CarCustomization, CarUpgrades, InputControls, RaceTrack, VehicleTelemetry, GameScreen } from '../types/game';
 import { createProceduralCar, CarVisualRig } from './proceduralCar';
 import { createProceduralCity, CityEnvironment } from './proceduralCity';
+import { TrafficSystem } from './traffic';
 import { VehiclePhysics } from './vehiclePhysics';
 import { RaceManager, RaceManagerState } from './raceManager';
 import { soundManager } from '../services/audio';
@@ -27,6 +28,7 @@ export class GameEngine {
   public carRig: CarVisualRig;
   public physics: VehiclePhysics;
   public raceManager: RaceManager | null = null;
+  private traffic: TrafficSystem;
 
   private container: HTMLDivElement;
   private isSoftwareGl = false;
@@ -131,6 +133,11 @@ export class GameEngine {
     // 6. City Environment
     this.city = createProceduralCity();
     this.scene.add(this.city.sceneGroup);
+
+    // Add autonomous cars and feed their moving colliders into vehicle physics.
+    this.traffic = new TrafficSystem();
+    this.scene.add(this.traffic.group);
+    this.city.collisionBoxes.push(...this.traffic.collisionBoxes);
 
     // 7. Car Visual Rig & Physics
     this.carRig = createProceduralCar(carConfig, customization);
@@ -265,17 +272,20 @@ export class GameEngine {
     const delta = Math.min((now - this.lastTime) / 1000, 0.08);
     this.lastTime = now;
 
-    // 1. Update Game Mode
+    // 1. Update city traffic and its dynamic collision boxes.
+    this.traffic.update(delta);
+
+    // 2. Update Game Mode
     if (this.currentScreen === 'racing' || this.currentScreen === 'free_drive') {
       this.updateActiveGameplay(delta);
     } else {
       this.updateShowroom(delta);
     }
 
-    // 2. City Environment update
+    // 3. City Environment update
     this.city.update(delta);
 
-    // 3. Render
+    // 4. Render
     this.renderer.render(this.scene, this.camera);
 
     // 4. Schedule next frame
@@ -429,6 +439,8 @@ export class GameEngine {
     soundManager.stopEngine();
 
     this.carRig.dispose();
+    this.traffic.dispose();
+    this.scene.remove(this.traffic.group);
     this.city.dispose();
     this.raceManager?.dispose();
 
