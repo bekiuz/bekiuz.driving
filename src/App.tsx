@@ -203,6 +203,7 @@ export default function App() {
       const handbrake = activeKeys.has('Space');
       const nitro = activeKeys.has('ShiftLeft') || activeKeys.has('ShiftRight');
       const reset = activeKeys.has('KeyR');
+      const lookBack = activeKeys.has('KeyB');
 
       inputRef.current = {
         throttle,
@@ -211,7 +212,7 @@ export default function App() {
         handbrake,
         nitro,
         reset,
-        lookBack: false,
+        lookBack,
       };
 
       engineRef.current?.setInput(inputRef.current);
