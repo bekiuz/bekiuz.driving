@@ -242,19 +242,17 @@ export class VehiclePhysics {
     // Determine target ground level
     let targetGroundY = 0.4; // Default asphalt level
 
-    // Check Bridge elevation (East highway between X: 180 and 210, Z: -155 to 160)
-    if (Math.abs(carX - 195) < 14 && carZ >= -155 && carZ <= 160) {
-      // Approach ramps at ends
-      if (carZ > 125) {
-        // South ramp
-        const rampFrac = (160 - carZ) / 35;
-        targetGroundY = 0.4 + rampFrac * 5.2;
-      } else if (carZ < -120) {
-        // North ramp
-        const rampFrac = (carZ - (-155)) / 35;
-        targetGroundY = 0.4 + rampFrac * 5.2;
+    // Raised bridge: both ramps meet the perimeter roads at ground level.
+    if (Math.abs(carX - 195) < 14 && carZ >= -150 && carZ <= 150) {
+      if (carZ > 115) {
+        // South ramp: ground at Z=150, deck at Z=115.
+        const rampFraction = (150 - carZ) / 35;
+        targetGroundY = 0.4 + rampFraction * 5.2;
+      } else if (carZ < -115) {
+        // North ramp: ground at Z=-150, deck at Z=-115.
+        const rampFraction = (carZ + 150) / 35;
+        targetGroundY = 0.4 + rampFraction * 5.2;
       } else {
-        // Center flat bridge deck
         targetGroundY = 5.62;
       }
     }
