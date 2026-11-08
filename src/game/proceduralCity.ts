@@ -340,7 +340,6 @@ export function createProceduralCity(): CityEnvironment {
   // Short paved links close the 3 m gap between the perimeter roads and bridge deck.
   const southLink = new THREE.Mesh(new THREE.PlaneGeometry(3, roadWidth), roadMat);
   southLink.rotation.x = -Math.PI / 2;
-  southLink.rotation.y = Math.PI / 2;
   southLink.position.set(181.5, 0.01, bridgeEndZ + 10);
   const northLink = southLink.clone();
   northLink.position.z = bridgeStartZ - 10;
