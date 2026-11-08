@@ -70,9 +70,9 @@ export class VehiclePhysics {
     const suspMult = 1 + (this.upgrades.suspension - 1) * 0.06;
     const brakeMult = 1 + (this.upgrades.brakes - 1) * 0.08;
 
-    const topSpeedKmh = baseStats.topSpeed * engineMult;
+    const topSpeedKmh = baseStats.topSpeed * 0.82 * engineMult;
     this.maxSpeedMs = (topSpeedKmh * 1000) / 3600;
-    this.accelerationForce = (baseStats.acceleration * 2.8) * transMult * engineMult;
+    this.accelerationForce = (baseStats.acceleration * 0.9) * transMult * engineMult;
     this.brakeForce = (baseStats.braking * 3.5) * brakeMult;
     this.gripFactor = 0.91 + (baseStats.handling / 10) * 0.05 * suspMult;
   }
@@ -114,9 +114,9 @@ export class VehiclePhysics {
       engineAccel = -this.accelerationForce * 0.5 * input.brake;
     } else if (input.throttle > 0.05) {
       // Forward driving
-      const nitroBoost = this.isNitroActive ? 1.65 : 1.0;
+      const nitroBoost = this.isNitroActive ? 1.4 : 1.0;
       // Torque curve: highest in low gears, tapering near top speed
-      const effectiveMaxSpeed = this.isNitroActive ? this.maxSpeedMs * 1.25 : this.maxSpeedMs;
+      const effectiveMaxSpeed = this.isNitroActive ? this.maxSpeedMs * 1.15 : this.maxSpeedMs;
       const speedHeadroom = Math.max(0, (effectiveMaxSpeed - this.forwardSpeed) / effectiveMaxSpeed);
       engineAccel = this.accelerationForce * input.throttle * nitroBoost * (0.4 + speedHeadroom * 0.6);
     }
@@ -152,7 +152,7 @@ export class VehiclePhysics {
     }
 
     // Clamp speed limits
-    const maxForward = this.isNitroActive ? this.maxSpeedMs * 1.25 : this.maxSpeedMs;
+    const maxForward = this.isNitroActive ? this.maxSpeedMs * 1.15 : this.maxSpeedMs;
     this.forwardSpeed = Math.max(-this.maxReverseMs, Math.min(maxForward, this.forwardSpeed));
 
     // 4. Turning & Yaw Rotation
