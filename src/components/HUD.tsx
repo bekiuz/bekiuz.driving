@@ -70,6 +70,12 @@ export const HUD: React.FC<HUDProps> = ({
               {isRacing ? 'RACE MODE' : 'FREE DRIVE'}
             </div>
 
+            {/* Police Pursuit Indicator */}
+            <div className="px-3 py-1 rounded-md glass-panel border border-red-500/40 text-red-300 font-race font-bold text-[10px] tracking-wider flex items-center gap-2 shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              POLICE PURSUIT
+            </div>
+
             {/* Currency Pill */}
             <div className="px-3 py-1 rounded-md glass-panel border border-amber-500/30 text-amber-300 font-race font-bold text-xs flex items-center gap-1.5 shadow-lg">
               <span className="text-amber-400">$</span>
@@ -175,6 +181,9 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
             <div>
               <span className="text-cyan-400 font-bold">SHIFT</span> NITRO
+            </div>
+            <div>
+              <span className="text-red-300 font-bold">B</span> REAR VIEW
             </div>
           </div>
         ) : (
