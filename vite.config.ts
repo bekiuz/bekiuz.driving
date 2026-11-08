@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages serves this repository from /bekiuz.driving/.
+    // Keep the normal root path for local development.
+    base: process.env.GITHUB_PAGES === 'true' ? '/bekiuz.driving/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
