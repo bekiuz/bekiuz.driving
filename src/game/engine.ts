@@ -40,6 +40,7 @@ export class GameEngine {
   private isDestroyed = false;
 
   private currentScreen: GameScreen = 'menu';
+  private isPaused = false;
   private cameraDistanceMode: 'close' | 'normal' | 'far' | 'hood' = 'normal';
 
   // Camera damping targets
@@ -200,6 +201,11 @@ export class GameEngine {
 
   public setScreenMode(screen: GameScreen) {
     this.currentScreen = screen;
+    this.isPaused = false;
+    this.currentInput = {
+      throttle: 0, brake: 0, steer: 0, handbrake: false,
+      nitro: false, reset: false, lookBack: false,
+    };
     const isDriving = screen === 'free_drive' || screen === 'racing';
     this.police.setActive(isDriving, this.physics.position, this.physics.rotationY);
     if (isDriving) {
@@ -210,7 +216,18 @@ export class GameEngine {
   }
 
   public setInput(input: InputControls) {
+    if (this.isPaused) return;
     this.currentInput = { ...input };
+  }
+
+  public setPaused(paused: boolean) {
+    this.isPaused = paused;
+    if (paused) {
+      this.currentInput = {
+        throttle: 0, brake: 0, steer: 0, handbrake: false,
+        nitro: false, reset: false, lookBack: false,
+      };
+    }
   }
 
   public setCameraDistance(mode: 'close' | 'normal' | 'far' | 'hood') {
@@ -510,18 +527,25 @@ export class GameEngine {
     const delta = Math.min((now - this.lastTime) / 1000, 0.08);
     this.lastTime = now;
 
+    // Freeze gameplay and world motion while paused or after a race finishes.
+    const isGameplayScreen =
+      this.currentScreen === 'racing' || this.currentScreen === 'free_drive';
+    const raceIsFinished =
+      this.currentScreen === 'racing' && this.raceManager?.status === 'finished';
+    const gameplayFrozen = this.isPaused || raceIsFinished;
+
     // 1. Update city traffic and its dynamic collision boxes.
-    this.traffic.update(delta);
+    if (!gameplayFrozen) this.traffic.update(delta);
 
     // 2. Update Game Mode
-    if (this.currentScreen === 'racing' || this.currentScreen === 'free_drive') {
-      this.updateActiveGameplay(delta);
+    if (isGameplayScreen) {
+      if (!gameplayFrozen) this.updateActiveGameplay(delta);
     } else {
       this.updateShowroom(delta);
     }
 
     // 3. City Environment update
-    this.city.update(delta);
+    if (!gameplayFrozen) this.city.update(delta);
 
     // 4. Render
     this.renderer.render(this.scene, this.camera);

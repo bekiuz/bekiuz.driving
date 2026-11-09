@@ -98,6 +98,14 @@ export default function App() {
     lookBack: false,
   });
 
+  const resetInputState = () => {
+    inputRef.current = {
+      throttle: 0, brake: 0, steer: 0, handbrake: false,
+      nitro: false, reset: false, lookBack: false,
+    };
+    engineRef.current?.setInput(inputRef.current);
+  };
+
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -227,16 +235,23 @@ export default function App() {
           setIsPaused((p) => {
             const next = !p;
             if (next) {
+              activeKeys.clear();
+              updateInputs();
               soundManager.pauseAll();
               yandexSdk.notifyGameplayStop();
             } else {
               soundManager.resumeAll();
               yandexSdk.notifyGameplayStart();
             }
+            engineRef.current?.setPaused(next);
             return next;
           });
           return;
         }
+      }
+
+      if (isPaused || (currentScreen !== 'free_drive' && currentScreen !== 'racing')) {
+        return;
       }
 
       // Camera view toggle (C key)
@@ -275,10 +290,12 @@ export default function App() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [currentScreen]);
+  }, [currentScreen, isPaused]);
 
   // Screen Navigation handlers
   const handleStartFreeDrive = () => {
+    resetInputState();
+    engineRef.current?.setPaused(false);
     setCurrentScreen('free_drive');
     setIsPaused(false);
     setShowRaceResults(false);
@@ -293,6 +310,8 @@ export default function App() {
   };
 
   const handleStartRace = (track: RaceTrack) => {
+    resetInputState();
+    engineRef.current?.setPaused(false);
     setActiveTrack(track);
     setCurrentScreen('racing');
     setIsPaused(false);
@@ -320,6 +339,8 @@ export default function App() {
   };
 
   const handleBackToMenu = () => {
+    resetInputState();
+    engineRef.current?.setPaused(false);
     if (currentScreen === 'garage') {
       // Restore the actually selected vehicle after previewing locked cars.
       engineRef.current?.switchCar(activeCar, activeUpgrades, activeCustomization);
@@ -527,6 +548,7 @@ export default function App() {
           onPause={() => {
             soundManager.playUiClick();
             setIsPaused(true);
+            engineRef.current?.setPaused(true);
             soundManager.pauseAll();
             yandexSdk.notifyGameplayStop();
           }}
@@ -542,6 +564,7 @@ export default function App() {
           isRacing={currentScreen === 'racing'}
           onResume={() => {
             setIsPaused(false);
+            engineRef.current?.setPaused(false);
             soundManager.resumeAll();
             yandexSdk.notifyGameplayStart();
           }}

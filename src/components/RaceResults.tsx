@@ -31,6 +31,9 @@ export const RaceResults: React.FC<RaceResultsProps> = ({
   const [hasClaimedDouble, setHasClaimedDouble] = useState(false);
   const [adLoading, setAdLoading] = useState(false);
 
+  const doubleRewardBonus =
+    baseRewardCoins + (isNewRecord ? Math.round(baseRewardCoins * 0.5) : 0);
+
   const formatTime = (ms: number) => {
     const totalSec = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSec / 60);
@@ -46,7 +49,7 @@ export const RaceResults: React.FC<RaceResultsProps> = ({
 
     yandexSdk.showRewardedAd({
       onRewarded: () => {
-        onAddCurrency(baseRewardCoins);
+        onAddCurrency(doubleRewardBonus);
         setHasClaimedDouble(true);
         soundManager.playUpgradeSound();
       },
@@ -64,6 +67,9 @@ export const RaceResults: React.FC<RaceResultsProps> = ({
     // Show interstitial / fullscreen ad between races as required by Yandex Games guidelines
     yandexSdk.showFullscreenAd({
       onClosed: () => {
+        onContinue();
+      },
+      onError: () => {
         onContinue();
       },
     });
@@ -131,7 +137,7 @@ export const RaceResults: React.FC<RaceResultsProps> = ({
             className="w-full py-3.5 mb-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-race font-black text-sm flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95 disabled:opacity-50"
           >
             <Gift className="w-4 h-4" />
-            <span>{adLoading ? 'LOADING AD...' : `DOUBLE REWARD (+${baseRewardCoins})`}</span>
+            <span>{adLoading ? 'LOADING AD...' : `DOUBLE REWARD (+${doubleRewardBonus})`}</span>
           </button>
         )}
 
